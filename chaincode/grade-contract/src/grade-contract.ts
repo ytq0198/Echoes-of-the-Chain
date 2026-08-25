@@ -187,6 +187,23 @@ export class GradeContract extends Contract {
     return JSON.stringify(await this.readCredentialRecord(ctx, credentialId));
   }
 
+  public async ReadPrivateCredential(ctx: Context, credentialId: string): Promise<string> {
+    this.assertRole(ctx, 'student');
+    const record = await this.readCredentialRecord(ctx, credentialId);
+    this.assertSameOrganization(ctx, record.issuerMspId);
+    if (ctx.clientIdentity.getAttributeValue('subject.hash') !== record.subjectHash) {
+      throw new AcademicRecordError('FORBIDDEN', 'students may read only their own credential');
+    }
+    const privateDetails = await ctx.stub.getPrivateData(
+      `_implicit_org_${record.issuerMspId}`,
+      this.credentialKey(credentialId),
+    );
+    if (!privateDetails || privateDetails.length === 0) {
+      throw new AcademicRecordError('MISSING_PRIVATE_DATA', 'credential details are unavailable');
+    }
+    return Buffer.from(privateDetails).toString('utf8');
+  }
+
   public async VerifyCredential(
     ctx: Context,
     credentialId: string,

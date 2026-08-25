@@ -44,6 +44,8 @@ function context(ledger: MockLedger, identity: IdentityOptions): Context {
       putPrivateData: async (collection: string, key: string, value: Uint8Array) => {
         ledger.privateState.set(`${collection}:${key}`, Buffer.from(value));
       },
+      getPrivateData: async (collection: string, key: string) =>
+        ledger.privateState.get(`${collection}:${key}`) ?? Buffer.alloc(0),
       getTxID: () => ledger.txId,
       getTxTimestamp: () => ({ seconds: { toString: () => '1787587200' }, nanos: 0 }),
     },
@@ -268,6 +270,24 @@ describe('GradeContract', () => {
         '_implicit_org_UniversityAMSP:appeal:appeal:2026:0001:resolution',
       ),
     ).toEqual(resolutionDetails);
+  });
+
+  it('allows only the credential subject to read private grade details', async () => {
+    await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:private-read'));
+    await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:private-read');
+    const student = { id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash } as const;
+    expect(
+      await contract.ReadPrivateCredential(context(ledger, student), 'cred:2026:private-read'),
+    ).toBe(gradeDetails.toString('utf8'));
+    await expect(
+      contract.ReadPrivateCredential(
+        context(ledger, { ...student, subjectHash: sha256('different-student') }),
+        'cred:2026:private-read',
+      ),
+    ).rejects.toThrow('FORBIDDEN');
+    await expect(
+      contract.ReadPrivateCredential(context(ledger, reviewer), 'cred:2026:private-read'),
+    ).rejects.toThrow('requires student role');
   });
 
   it('does not let an identity from another organization appeal an issued credential', async () => {

@@ -31,6 +31,7 @@ function mockLedger(): CredentialLedger {
     createAmendment: vi.fn(),
     approve: vi.fn(),
     read: vi.fn(async () => credential),
+    readPrivateDetails: vi.fn(),
     verify: vi.fn(),
     submitAppeal: vi.fn(async (command) =>
       appealRecord({ appealId: command.appealId, credentialId: command.credentialId, reasonHash: command.reasonHash }),

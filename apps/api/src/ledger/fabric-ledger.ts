@@ -92,6 +92,13 @@ export class FabricCredentialLedger implements CredentialLedger {
     );
   }
 
+  public async readPrivateDetails(credentialId: string): Promise<Record<string, unknown>> {
+    const contract = await this.contractFor('student');
+    return decodeJson<Record<string, unknown>>(
+      await contract.evaluateTransaction('ReadPrivateCredential', credentialId),
+    );
+  }
+
   public async verify(
     credentialId: string,
     expectedDetailHash = '',

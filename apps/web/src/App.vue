@@ -4,6 +4,16 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 type View = 'home' | 'issuer' | 'reviewer' | 'student' | 'verify';
 type RequestState = 'idle' | 'loading' | 'success' | 'error';
+type AppRole = 'issuer' | 'reviewer' | 'student';
+
+interface SessionView {
+  authenticated: boolean;
+  username?: string;
+  role?: AppRole;
+  subjectHash?: string;
+  csrfToken?: string;
+  expiresAt?: string;
+}
 
 interface VerificationResult {
   credentialId: string;
@@ -21,6 +31,11 @@ const demoCourseHash = 'b'.repeat(64);
 const views: View[] = ['home', 'issuer', 'reviewer', 'student', 'verify'];
 const currentView = ref<View>('home');
 const mobileMenuOpen = ref(false);
+const authRequired = ref(true);
+const session = ref<SessionView>({ authenticated: false });
+const loginState = ref<RequestState>('idle');
+const loginMessage = ref('');
+const loginForm = ref({ username: 'demo-issuer', password: '' });
 
 const issuerState = ref<RequestState>('idle');
 const issuerMessage = ref('');
@@ -42,6 +57,9 @@ const studentCredentialId = ref('cred:2026:real01');
 const studentState = ref<RequestState>('idle');
 const studentMessage = ref('');
 const studentRecord = ref<PublicCredentialRecord>();
+const privateDetailsState = ref<RequestState>('idle');
+const privateDetailsMessage = ref('');
+const privateDetails = ref<Record<string, unknown>>();
 const appealState = ref<RequestState>('idle');
 const appealMessage = ref('');
 const submittedAppeal = ref<PublicAppealRecord>();
@@ -53,19 +71,42 @@ const verifyMessage = ref('');
 const verification = ref<VerificationResult>();
 
 const viewLabel = computed(() => ({ home: '项目总览', issuer: '教师签发台', reviewer: '复核工作台', student: '学生凭证夹', verify: '公开验真' })[currentView.value]);
+const requiredRole = computed<AppRole | undefined>(() => ({ issuer: 'issuer', reviewer: 'reviewer', student: 'student' } as Partial<Record<View, AppRole>>)[currentView.value]);
+const sessionMatchesView = computed(() => !authRequired.value || !requiredRole.value || (session.value.authenticated && session.value.role === requiredRole.value));
 
 function viewFromHash(): View {
   const candidate = window.location.hash.replace(/^#\/?/, '') as View;
   return views.includes(candidate) ? candidate : 'home';
 }
-function syncHash(): void { currentView.value = viewFromHash(); mobileMenuOpen.value = false; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function syncHash(): void { currentView.value = viewFromHash(); mobileMenuOpen.value = false; if (!session.value.authenticated && requiredRole.value) loginForm.value.username = `demo-${requiredRole.value}`; window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function openView(view: View): void { window.location.hash = `#${view}`; }
 function scrollToAppeal(): void { document.getElementById('appeal-form')?.scrollIntoView({ behavior: 'smooth' }); }
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const headers = new Headers(init?.headers);
+  const method = (init?.method ?? 'GET').toUpperCase();
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && session.value.csrfToken) headers.set('x-csrf-token', session.value.csrfToken);
+  const response = await fetch(url, { ...init, headers, credentials: 'same-origin' });
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) throw new Error(typeof payload.message === 'string' ? payload.message : `请求失败（${response.status}）`);
   return payload as T;
+}
+
+async function loadSession(): Promise<void> {
+  try {
+    const response = await fetch('/api/v1/auth/session', { credentials: 'same-origin' });
+    if (response.status === 404) { authRequired.value = false; return; }
+    authRequired.value = true;
+    session.value = await response.json() as SessionView;
+  } catch { session.value = { authenticated: false }; }
+}
+async function login(): Promise<void> {
+  loginState.value = 'loading'; loginMessage.value = '';
+  try { session.value = await requestJson<SessionView>('/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(loginForm.value) }); loginForm.value.password = ''; loginState.value = 'success'; loginMessage.value = `已以 ${session.value.role} 身份建立短期会话。`; }
+  catch (error) { loginState.value = 'error'; loginMessage.value = error instanceof Error ? error.message : '登录失败'; }
+}
+async function logout(): Promise<void> {
+  try { await requestJson<SessionView>('/api/v1/auth/logout', { method: 'POST' }); }
+  finally { session.value = { authenticated: false }; loginForm.value.username = requiredRole.value ? `demo-${requiredRole.value}` : 'demo-student'; }
 }
 
 async function submitCredential(): Promise<void> {
@@ -103,9 +144,15 @@ async function resolveAppeal(): Promise<void> {
   catch (error) { appealReviewState.value = 'error'; appealReviewMessage.value = error instanceof Error ? error.message : '申诉处理失败'; }
 }
 async function loadStudentCredential(): Promise<void> {
-  studentState.value = 'loading'; studentMessage.value = '';
+  studentState.value = 'loading'; studentMessage.value = ''; privateDetails.value = undefined; privateDetailsMessage.value = ''; privateDetailsState.value = 'idle';
   try { studentRecord.value = await requestJson<PublicCredentialRecord>(`/api/v1/credentials/${encodeURIComponent(studentCredentialId.value)}`); studentState.value = 'success'; }
   catch (error) { studentState.value = 'error'; studentMessage.value = error instanceof Error ? error.message : '查询失败'; }
+}
+async function loadPrivateDetails(): Promise<void> {
+  const credentialId = studentRecord.value?.credentialId ?? studentCredentialId.value;
+  privateDetailsState.value = 'loading'; privateDetailsMessage.value = '';
+  try { privateDetails.value = await requestJson<Record<string, unknown>>(`/api/v1/credentials/${encodeURIComponent(credentialId)}/private-details`); privateDetailsState.value = 'success'; privateDetailsMessage.value = '链码已验证学生证书 subject.hash，私有成绩仅在本次授权响应中返回。'; }
+  catch (error) { privateDetailsState.value = 'error'; privateDetailsMessage.value = error instanceof Error ? error.message : '私有成绩读取失败'; }
 }
 async function submitAppeal(): Promise<void> {
   appealState.value = 'loading'; appealMessage.value = ''; submittedAppeal.value = undefined;
@@ -120,7 +167,7 @@ async function verifyCredential(): Promise<void> {
 }
 function shortHash(value: string): string { return `${value.slice(0, 10)} ··· ${value.slice(-8)}`; }
 function formatTime(value: string): string { return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)); }
-onMounted(() => { currentView.value = viewFromHash(); window.addEventListener('hashchange', syncHash); });
+onMounted(() => { currentView.value = viewFromHash(); if (requiredRole.value) loginForm.value.username = `demo-${requiredRole.value}`; void loadSession(); window.addEventListener('hashchange', syncHash); });
 onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
 </script>
 
@@ -129,6 +176,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
     <nav class="nav shell" aria-label="主导航">
       <a class="brand" href="#home" aria-label="ChainGrade 首页"><span class="brand-mark" aria-hidden="true">CG</span><span>ChainGrade</span></a>
       <div class="desktop-nav"><a href="#issuer">教师签发</a><a href="#reviewer">独立复核</a><a href="#student">学生凭证</a><a class="nav-verify" href="#verify">公开验真</a></div>
+      <div v-if="authRequired && session.authenticated" class="session-nav"><span>{{ session.role }}</span><b>{{ session.username }}</b><button type="button" @click="logout">退出</button></div>
       <button class="menu-button" type="button" aria-label="切换导航" @click="mobileMenuOpen = !mobileMenuOpen">{{ mobileMenuOpen ? '关闭' : '菜单' }}</button>
       <div v-if="mobileMenuOpen" class="mobile-nav"><a href="#issuer">教师签发</a><a href="#reviewer">独立复核</a><a href="#student">学生凭证</a><a href="#verify">公开验真</a></div>
     </nav>
@@ -144,12 +192,13 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
         <button type="button" class="role-card" @click="openView('student')"><span>03 / STUDENT</span><h3>学生凭证夹</h3><p>查看凭证当前状态、版本与更新时间，为后续申诉和披露授权提供入口。</p><b>查看我的凭证 →</b></button>
         <button type="button" class="role-card verify-card" @click="openView('verify')"><span>04 / VERIFIER</span><h3>公开验真</h3><p>无需接触成绩明文，以凭证标识和哈希判断真实性与有效性。</p><b>验证一份凭证 →</b></button>
       </div></section>
-      <section class="evidence-section"><div class="shell evidence-grid"><div><p class="eyebrow light">VERIFIED ON REAL FABRIC</p><h2>不是原型截图，<br />是真实交易闭环。</h2></div><dl class="metrics"><div><dt>25</dt><dd>自动测试</dd></div><div><dt>91.47%</dt><dd>链码语句覆盖率</dd></div><div><dt>2</dt><dd>独立组织批准</dd></div><div><dt>20</dt><dd>E2E 后账本高度</dd></div></dl></div></section>
+      <section class="evidence-section"><div class="shell evidence-grid"><div><p class="eyebrow light">VERIFIED ON REAL FABRIC</p><h2>不是原型截图，<br />是真实交易闭环。</h2></div><dl class="metrics"><div><dt>31</dt><dd>自动测试</dd></div><div><dt>91.47%</dt><dd>链码语句覆盖率</dd></div><div><dt>3</dt><dd>属性身份角色</dd></div><div><dt>20</dt><dd>E2E 后账本高度</dd></div></dl></div></section>
     </template>
 
     <template v-else>
-      <header class="workspace-header shell"><div><p class="eyebrow">CHAIN GRADE WORKSPACE</p><h1>{{ viewLabel }}</h1></div><span class="phase-badge">Iteration 2 · 修订申诉</span></header>
-      <section v-if="currentView === 'issuer'" class="workspace shell">
+      <header class="workspace-header shell"><div><p class="eyebrow">CHAIN GRADE WORKSPACE</p><h1>{{ viewLabel }}</h1></div><span class="phase-badge">Iteration 3 · 会话授权</span></header>
+      <section v-if="!sessionMatchesView" class="auth-gate shell"><div><span class="role-token">SECURE SESSION</span><h2>{{ session.authenticated ? '当前角色与工作台不匹配' : '登录后进入角色工作台' }}</h2><p>Cookie 仅供浏览器自动携带，JavaScript 无法读取；状态变更还必须通过同源与 CSRF 令牌校验。</p><p v-if="session.authenticated" class="notice error">当前会话为 {{ session.role }}，本页面要求 {{ requiredRole }}。登录新账号将安全替换当前会话。</p></div><form class="auth-form" @submit.prevent="login"><div class="field"><label for="login-username">演示账号</label><input id="login-username" v-model="loginForm.username" autocomplete="username" required /></div><div class="field"><label for="login-password">密码</label><input id="login-password" v-model="loginForm.password" type="password" autocomplete="current-password" required /></div><button class="button primary" :disabled="loginState === 'loading'">{{ loginState === 'loading' ? '正在建立会话…' : '安全登录' }}</button><p v-if="loginMessage" class="notice" :class="loginState">{{ loginMessage }}</p><small>仓库不包含密码。演示凭据由服务器环境变量注入，会话默认 1 小时后失效。</small></form></section>
+      <section v-else-if="currentView === 'issuer'" class="workspace shell">
         <div class="workspace-intro"><span class="role-token">ISSUER</span><h2>创建待复核成绩草稿</h2><p>成绩详情会先规范化并计算 SHA-256，再通过 transient data 进入签发组织的隐式私有集合。</p></div>
         <form class="form-panel" @submit.prevent="submitCredential"><div class="field wide"><label for="credential-id">凭证标识</label><input id="credential-id" v-model="issuerForm.credentialId" required /></div><div class="field"><label for="course-name">课程名称</label><input id="course-name" v-model="issuerForm.courseName" required /></div><div class="field"><label for="score">成绩</label><input id="score" v-model.number="issuerForm.score" type="number" min="0" max="100" required /></div><div class="field"><label for="grade">等级</label><select id="grade" v-model="issuerForm.grade"><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select></div><div class="field"><label for="schema-version">Schema 版本</label><input id="schema-version" v-model="issuerForm.schemaVersion" required /></div><div class="field wide"><label for="subject-hash">学生匿名标识（SHA-256）</label><input id="subject-hash" v-model="issuerForm.subjectHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="course-hash">课程标识（SHA-256）</label><input id="course-hash" v-model="issuerForm.courseHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="salt">隐私盐值</label><input id="salt" v-model="issuerForm.salt" class="mono" minlength="16" required /><small>演示数据使用固定合成盐；正式环境必须使用安全随机值。</small></div><div class="form-actions"><button class="button primary" :disabled="issuerState === 'loading'">{{ issuerState === 'loading' ? '正在提交…' : '提交至 Fabric' }}</button><span>复核前状态为 PENDING_REVIEW</span></div><p v-if="issuerMessage" class="notice" :class="issuerState">{{ issuerMessage }}</p></form>
         <article v-if="issuedRecord" class="result-card"><div><span class="status pending">{{ issuedRecord.status }}</span><h3>{{ issuedRecord.credentialId }}</h3></div><dl><div><dt>详情承诺</dt><dd class="mono">{{ shortHash(issuedRecord.detailHash) }}</dd></div><div><dt>交易 ID</dt><dd class="mono">{{ shortHash(issuedRecord.transactionId) }}</dd></div></dl><button class="text-button" @click="openView('reviewer')">交给复核员 →</button></article>
@@ -164,7 +213,8 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
       <section v-else-if="currentView === 'student'" class="workspace shell">
         <div class="workspace-intro"><span class="role-token">STUDENT</span><h2>查看凭证并提交本人申诉</h2><p>学生端围绕“持有、理解、申诉、授权披露”设计。申诉由带有 subject.hash 属性的学生证书提交，理由只进入签发组织私有集合。</p></div>
         <div class="lookup-panel"><label for="student-id">凭证标识</label><div class="lookup-row"><input id="student-id" v-model="studentCredentialId" /><button class="button secondary" :disabled="studentState === 'loading'" @click="loadStudentCredential">打开凭证</button></div><p v-if="studentMessage" class="notice" :class="studentState">{{ studentMessage }}</p></div>
-        <article v-if="studentRecord" class="student-card"><div class="credential-seal">CG</div><div class="student-card-main"><p>ACADEMIC CREDENTIAL · v{{ studentRecord.version }}</p><h3>{{ studentRecord.credentialId }}</h3><span class="status" :class="studentRecord.status.toLowerCase()">{{ studentRecord.status }}</span><dl><div><dt>签发组织</dt><dd>{{ studentRecord.issuerMspId }}</dd></div><div><dt>最近更新</dt><dd>{{ formatTime(studentRecord.updatedAt) }}</dd></div><div><dt>成绩详情</dt><dd>仅授权后披露</dd></div></dl><div class="student-actions"><button class="button secondary" :disabled="studentRecord.status !== 'ACTIVE'" @click="scrollToAppeal">发起成绩申诉</button><button class="button primary" @click="openView('verify')">生成验真入口</button></div></div></article>
+        <article v-if="studentRecord" class="student-card"><div class="credential-seal">CG</div><div class="student-card-main"><p>ACADEMIC CREDENTIAL · v{{ studentRecord.version }}</p><h3>{{ studentRecord.credentialId }}</h3><span class="status" :class="studentRecord.status.toLowerCase()">{{ studentRecord.status }}</span><dl><div><dt>签发组织</dt><dd>{{ studentRecord.issuerMspId }}</dd></div><div><dt>最近更新</dt><dd>{{ formatTime(studentRecord.updatedAt) }}</dd></div><div><dt>成绩详情</dt><dd>{{ privateDetails ? '本人授权已读取' : '仅授权后披露' }}</dd></div></dl><div class="student-actions"><button class="button secondary" :disabled="studentRecord.status !== 'ACTIVE'" @click="scrollToAppeal">发起成绩申诉</button><button class="button secondary" :disabled="privateDetailsState === 'loading'" @click="loadPrivateDetails">{{ privateDetailsState === 'loading' ? '正在验证证书…' : '授权读取成绩' }}</button><button class="button primary" @click="openView('verify')">生成验真入口</button></div></div></article>
+        <article v-if="privateDetails || privateDetailsMessage" class="private-details-card"><div class="operation-heading"><div><p class="eyebrow">SUBJECT-BOUND DISCLOSURE</p><h3>仅向本人披露的成绩详情</h3></div><span>Cache-Control: no-store</span></div><p v-if="privateDetailsMessage" class="notice" :class="privateDetailsState">{{ privateDetailsMessage }}</p><dl v-if="privateDetails"><div v-for="(value, key) in privateDetails" :key="key"><dt>{{ key }}</dt><dd :class="{ mono: key === 'salt' }">{{ key === 'salt' ? '••••••••（不展示）' : value }}</dd></div></dl></article>
         <section id="appeal-form" class="operation-panel"><div class="operation-heading"><div><p class="eyebrow">PRIVATE APPEAL</p><h3>提交轻量成绩申诉</h3></div><span>学生属性证书约束本人凭证</span></div><form class="compact-form" @submit.prevent="submitAppeal"><div class="field"><label for="appeal-id">申诉标识</label><input id="appeal-id" v-model="appealForm.appealId" required /></div><div class="field"><label>关联凭证</label><input :value="studentRecord?.credentialId ?? studentCredentialId" disabled /></div><div class="field wide"><label for="appeal-reason">申诉理由</label><textarea id="appeal-reason" v-model="appealForm.reason" minlength="10" maxlength="2000" required></textarea></div><div class="field wide"><label for="appeal-salt">申诉隐私盐值</label><input id="appeal-salt" v-model="appealForm.salt" class="mono" minlength="16" required /></div><button class="button primary" :disabled="appealState === 'loading' || studentRecord?.status !== 'ACTIVE'">{{ appealState === 'loading' ? '正在提交…' : '由学生证书提交申诉' }}</button><p v-if="appealMessage" class="notice" :class="appealState">{{ appealMessage }}</p></form><article v-if="submittedAppeal" class="mini-result"><span class="status open">{{ submittedAppeal.status }}</span><b>{{ submittedAppeal.appealId }}</b><span class="mono">reason {{ shortHash(submittedAppeal.reasonHash) }}</span></article></section>
       </section>
       <section v-else class="workspace verify-workspace shell">

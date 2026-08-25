@@ -48,6 +48,7 @@ function mockLedger(): CredentialLedger {
     ),
     approve: vi.fn(async (credentialId) => activeRecord({ credentialId })),
     read: vi.fn(async (credentialId) => activeRecord({ credentialId })),
+    readPrivateDetails: vi.fn(async () => ({ score: 92, grade: 'A' })),
     verify: vi.fn(async (credentialId) => ({
       credentialId,
       authentic: true,
@@ -131,6 +132,19 @@ describe('credential routes', () => {
       'cred:2026:api01',
       expect.objectContaining({ subjectHash: hash, courseHash: hash }),
     );
+    await app.close();
+  });
+
+  it('marks private grade details as non-cacheable', async () => {
+    const ledger = mockLedger();
+    const app = buildApp({ ledger });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/credentials/cred:2026:api01/private-details',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.json()).toMatchObject({ score: 92, grade: 'A' });
     await app.close();
   });
 });

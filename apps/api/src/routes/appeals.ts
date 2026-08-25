@@ -9,10 +9,12 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { canonicalJson } from '../lib/canonical-json.js';
+import type { SessionService } from '../auth/session.js';
 import type { CredentialLedger } from '../ledger/types.js';
 
 interface RouteOptions {
   ledger?: CredentialLedger;
+  sessions?: SessionService;
 }
 
 const appealParamsSchema = z.object({ appealId: identifierSchema });
@@ -24,6 +26,7 @@ export async function registerAppealRoutes(
 ): Promise<void> {
   app.post('/api/v1/credentials/:credentialId/appeals', async (request, reply) => {
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'student', { csrf: true });
     const { credentialId } = credentialParamsSchema.parse(request.params);
     const input = createAppealRequestSchema.parse(request.body);
     const privateDetails = Buffer.from(canonicalJson(input.details));
@@ -39,12 +42,14 @@ export async function registerAppealRoutes(
 
   app.get('/api/v1/appeals/:appealId', async (request, reply) => {
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'reviewer');
     const { appealId } = appealParamsSchema.parse(request.params);
     return reply.send(await options.ledger.readAppeal(appealId));
   });
 
   app.post('/api/v1/appeals/:appealId/review', async (request, reply) => {
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'reviewer', { csrf: true });
     const { appealId } = appealParamsSchema.parse(request.params);
     const input = reviewAppealRequestSchema.parse(request.body);
     const privateResolution = Buffer.from(canonicalJson(input.resolution));

@@ -44,6 +44,7 @@ export interface CredentialLedger {
   ): Promise<PublicCredentialRecord>;
   approve(credentialId: string): Promise<PublicCredentialRecord>;
   read(credentialId: string): Promise<PublicCredentialRecord>;
+  readPrivateDetails(credentialId: string): Promise<Record<string, unknown>>;
   verify(credentialId: string, expectedDetailHash?: string): Promise<CredentialVerification>;
   submitAppeal(command: CreateAppealCommand): Promise<PublicAppealRecord>;
   reviewAppeal(command: ReviewAppealCommand): Promise<PublicAppealRecord>;

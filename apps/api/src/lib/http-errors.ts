@@ -12,6 +12,9 @@ const statusByCode: Record<string, number> = {
   IMMUTABLE_IDENTITY: 409,
   INVALID_STATE: 409,
   STALE_AMENDMENT: 409,
+  AUTHENTICATION_REQUIRED: 401,
+  ROLE_FORBIDDEN: 403,
+  CSRF_INVALID: 403,
 };
 
 export function registerHttpErrorHandler(app: FastifyInstance): void {
@@ -69,6 +72,9 @@ function domainMessage(code: string): string {
       IMMUTABLE_IDENTITY: '修订不能改变学生或课程身份',
       INVALID_STATE: '记录当前状态不允许此操作',
       STALE_AMENDMENT: '原凭证已不再有效，修订草稿已过期',
+      AUTHENTICATION_REQUIRED: '请先登录后再执行此操作',
+      ROLE_FORBIDDEN: '当前登录角色无权执行此操作',
+      CSRF_INVALID: '请求来源或安全令牌校验失败',
     }[code] ?? '账本拒绝了该操作'
   );
 }

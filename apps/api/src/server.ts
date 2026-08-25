@@ -1,4 +1,5 @@
 import { buildApp } from './app.js';
+import { loadSessionConfig, SessionService } from './auth/session.js';
 import { loadFabricConfig } from './ledger/fabric-config.js';
 import { FabricCredentialLedger } from './ledger/fabric-ledger.js';
 
@@ -8,7 +9,9 @@ const ledger =
   process.env.FABRIC_ENABLED === 'true'
     ? new FabricCredentialLedger(loadFabricConfig())
     : undefined;
-const app = ledger ? buildApp({ ledger }) : buildApp();
+const sessionConfig = loadSessionConfig();
+const sessions = sessionConfig ? new SessionService(sessionConfig) : undefined;
+const app = buildApp({ ...(ledger ? { ledger } : {}), ...(sessions ? { sessions } : {}) });
 
 try {
   await app.listen({ port, host });
