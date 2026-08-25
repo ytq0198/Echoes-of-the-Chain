@@ -2,7 +2,7 @@
 
 面向区块链课程大作业与 CCF 大学生区块链技术与创新应用竞赛的学生团队项目。
 
-当前阶段：Iteration 2 修订与申诉闭环。真实 Fabric 2.5 LTS 网络、三类属性身份、链码生命周期、Fastify Gateway 与四角色 Web 工作台已经贯通；成绩修订、学生本人申诉和隐私复核结论均已通过真实账本验证。
+当前阶段：Iteration 3 会话授权与本人披露。真实 Fabric 2.5 LTS 网络、三类属性身份、短期签名会话、Fastify Gateway 与四角色 Web 工作台已经贯通；学生私有成绩只有在 HTTP 学生会话和链码证书 `subject.hash` 双重校验后才能读取。
 
 课程答辩和 CCF 竞赛提交始终对应同一个项目、同一仓库和同一套架构；课程验收只是连续开发过程中的一个里程碑。
 
@@ -17,6 +17,8 @@
 - 真实 Fabric Gateway 成绩提交、复核、读取与哈希验真 API
 - 成绩修订的原子版本替换，以及基于学生证书属性的轻量申诉闭环
 - Fabric peer 业务错误到稳定 HTTP 错误码的安全映射
+- `HttpOnly + SameSite=Strict` 短期签名会话、同源检查和 CSRF 防护
+- 学生本人属性证书约束的私有成绩读取，响应强制 `Cache-Control: no-store`
 
 ## 工程结构
 
@@ -50,6 +52,8 @@ Linux 上启动真实开发账本：
 ./infra/fabric/network.sh deploy
 FABRIC_ENABLED=true CHAINGRADE_PROJECT_ROOT="$PWD" pnpm dev:api
 ```
+
+启用受控演示认证时，复制 [`.env.example`](.env.example) 的变量到私有 shell 环境，替换所有密码和会话密钥，并设置 `AUTH_ENABLED=true`。正式 HTTPS 部署必须同时设置 `AUTH_SECURE_COOKIE=true`；仓库不会自动加载或保存真实 `.env` 文件。
 
 启动前端与 API（Vite 会把 `/api` 代理至本机 3000 端口）：
 

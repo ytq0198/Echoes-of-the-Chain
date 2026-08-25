@@ -159,6 +159,14 @@ export function loadSessionConfig(env: NodeJS.ProcessEnv = process.env): Session
   if (env.AUTH_ENABLED !== 'true') return undefined;
   const secret = requiredSecret(env.AUTH_SESSION_SECRET, 'AUTH_SESSION_SECRET', 32);
   const studentSubjectHash = requiredPattern(env.AUTH_STUDENT_SUBJECT_HASH, 'AUTH_STUDENT_SUBJECT_HASH', /^[a-f0-9]{64}$/);
+  const ttlSeconds = Number(env.AUTH_TTL_SECONDS ?? 3_600);
+  if (!Number.isInteger(ttlSeconds) || ttlSeconds < 300 || ttlSeconds > 28_800) {
+    throw new Error('AUTH_TTL_SECONDS must be an integer between 300 and 28800');
+  }
+  const allowedOrigins = (env.AUTH_ALLOWED_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean);
+  if (allowedOrigins.length === 0 || allowedOrigins.some((value) => !isOrigin(value))) {
+    throw new Error('AUTH_ALLOWED_ORIGINS must contain one or more exact HTTP(S) origins');
+  }
   return {
     secret,
     accounts: [
@@ -166,8 +174,8 @@ export function loadSessionConfig(env: NodeJS.ProcessEnv = process.env): Session
       { username: env.AUTH_REVIEWER_USERNAME ?? 'demo-reviewer', password: requiredSecret(env.AUTH_REVIEWER_PASSWORD, 'AUTH_REVIEWER_PASSWORD', 12), role: 'reviewer' },
       { username: env.AUTH_STUDENT_USERNAME ?? 'demo-student', password: requiredSecret(env.AUTH_STUDENT_PASSWORD, 'AUTH_STUDENT_PASSWORD', 12), role: 'student', subjectHash: studentSubjectHash },
     ],
-    allowedOrigins: (env.AUTH_ALLOWED_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean),
-    ttlSeconds: Number(env.AUTH_TTL_SECONDS ?? 3_600),
+    allowedOrigins,
+    ttlSeconds,
     secureCookie: env.AUTH_SECURE_COOKIE === 'true',
     allowNonBrowserClients: env.AUTH_ALLOW_NON_BROWSER_CLIENTS === 'true',
   };
@@ -196,4 +204,11 @@ function requiredSecret(value: string | undefined, name: string, minimumLength: 
 function requiredPattern(value: string | undefined, name: string, pattern: RegExp): string {
   if (!value || !pattern.test(value)) throw new Error(`${name} is invalid`);
   return value;
+}
+
+function isOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === value;
+  } catch { return false; }
 }

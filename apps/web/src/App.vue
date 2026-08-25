@@ -192,7 +192,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
         <button type="button" class="role-card" @click="openView('student')"><span>03 / STUDENT</span><h3>学生凭证夹</h3><p>查看凭证当前状态、版本与更新时间，为后续申诉和披露授权提供入口。</p><b>查看我的凭证 →</b></button>
         <button type="button" class="role-card verify-card" @click="openView('verify')"><span>04 / VERIFIER</span><h3>公开验真</h3><p>无需接触成绩明文，以凭证标识和哈希判断真实性与有效性。</p><b>验证一份凭证 →</b></button>
       </div></section>
-      <section class="evidence-section"><div class="shell evidence-grid"><div><p class="eyebrow light">VERIFIED ON REAL FABRIC</p><h2>不是原型截图，<br />是真实交易闭环。</h2></div><dl class="metrics"><div><dt>31</dt><dd>自动测试</dd></div><div><dt>91.47%</dt><dd>链码语句覆盖率</dd></div><div><dt>3</dt><dd>属性身份角色</dd></div><div><dt>20</dt><dd>E2E 后账本高度</dd></div></dl></div></section>
+      <section class="evidence-section"><div class="shell evidence-grid"><div><p class="eyebrow light">VERIFIED ON REAL FABRIC</p><h2>不是原型截图，<br />是真实交易闭环。</h2></div><dl class="metrics"><div><dt>32</dt><dd>自动测试</dd></div><div><dt>91.35%</dt><dd>链码语句覆盖率</dd></div><div><dt>3</dt><dd>属性身份角色</dd></div><div><dt>23</dt><dd>E2E 后账本高度</dd></div></dl></div></section>
     </template>
 
     <template v-else>
