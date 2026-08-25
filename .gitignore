@@ -6,6 +6,7 @@
 /tmp/
 
 # Local secrets and runtime state
+.tools/
 .env
 .env.*
 !.env.example
