@@ -32,3 +32,5 @@ To stop and remove only this test network's generated containers and material:
 The development endorsement policy is `OR('Org1MSP.peer','Org2MSP.peer')`. This permits an Org1 issuer to write its implicit private collection without disclosing the private grade payload to Org2. The competition topology will replace this with per-record/state-based endorsement and organization-specific access policies.
 
 LevelDB is sufficient for the current key-based credential workflow and keeps the reproducible development environment small. A CouchDB index is deferred until rich-query requirements are introduced.
+
+Deployment copies only the chaincode manifest, lockfile, TypeScript config, and source into `.tools/chaincode-stage`. This prevents pnpm workspace symlinks from leaking into Fabric's isolated npm chaincode image.
