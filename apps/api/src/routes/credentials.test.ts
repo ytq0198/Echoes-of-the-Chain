@@ -37,6 +37,15 @@ function mockLedger(): CredentialLedger {
         status: 'PENDING_REVIEW',
       }),
     ),
+    createAmendment: vi.fn(async (previousCredentialId, command) =>
+      activeRecord({
+        credentialId: command.credentialId,
+        detailHash: command.detailHash,
+        previousCredentialId,
+        status: 'PENDING_REVIEW',
+        version: 2,
+      }),
+    ),
     approve: vi.fn(async (credentialId) => activeRecord({ credentialId })),
     read: vi.fn(async (credentialId) => activeRecord({ credentialId })),
     verify: vi.fn(async (credentialId) => ({
@@ -49,6 +58,9 @@ function mockLedger(): CredentialLedger {
       updatedAt: '2026-08-25T00:01:00.000Z',
       transactionId: 'tx-api-01',
     })),
+    submitAppeal: vi.fn(),
+    reviewAppeal: vi.fn(),
+    readAppeal: vi.fn(),
     close: vi.fn(),
   };
 }
@@ -101,5 +113,24 @@ describe('credential routes', () => {
     expect(ledger.approve).toHaveBeenCalledWith('cred:2026:api03');
     await app.close();
   });
-});
 
+  it('inherits immutable identities when creating an amendment', async () => {
+    const ledger = mockLedger();
+    const app = buildApp({ ledger });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/credentials/cred:2026:api01/amendments',
+      payload: {
+        credentialId: 'cred:2026:api01-v2',
+        schemaVersion: '1.0',
+        details: { score: 95, salt: 'AMENDMENT_SALT_12345', grade: 'A' },
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(ledger.createAmendment).toHaveBeenCalledWith(
+      'cred:2026:api01',
+      expect.objectContaining({ subjectHash: hash, courseHash: hash }),
+    );
+    await app.close();
+  });
+});

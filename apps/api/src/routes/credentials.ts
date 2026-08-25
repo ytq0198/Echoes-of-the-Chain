@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 
-import { createCredentialRequestSchema, identifierSchema, sha256Schema } from '@chaingrade/shared';
+import {
+  createAmendmentRequestSchema,
+  createCredentialRequestSchema,
+  identifierSchema,
+  sha256Schema,
+} from '@chaingrade/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -39,6 +44,24 @@ export async function registerCredentialRoutes(
     return reply.send(await options.ledger.approve(credentialId));
   });
 
+  app.post('/api/v1/credentials/:credentialId/amendments', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    const { credentialId: previousCredentialId } = credentialParamsSchema.parse(request.params);
+    const input = createAmendmentRequestSchema.parse(request.body);
+    const previous = await options.ledger.read(previousCredentialId);
+    const privateDetails = Buffer.from(canonicalJson(input.details));
+    const detailHash = createHash('sha256').update(privateDetails).digest('hex');
+    const record = await options.ledger.createAmendment(previousCredentialId, {
+      credentialId: input.credentialId,
+      subjectHash: previous.subjectHash,
+      courseHash: previous.courseHash,
+      schemaVersion: input.schemaVersion,
+      detailHash,
+      privateDetails,
+    });
+    return reply.code(201).send(record);
+  });
+
   app.get('/api/v1/credentials/:credentialId', async (request, reply) => {
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
     const { credentialId } = credentialParamsSchema.parse(request.params);
@@ -52,4 +75,3 @@ export async function registerCredentialRoutes(
     return reply.send(await options.ledger.verify(credentialId, query.detailHash));
   });
 }
-

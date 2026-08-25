@@ -250,15 +250,24 @@ describe('GradeContract', () => {
     ) as AppealRecord;
     expect(submitted.status).toBe('OPEN');
 
+    const resolutionDetails = Buffer.from(
+      JSON.stringify({ summary: 'The appeal is accepted.', salt: 'RESOLUTION_SAFE_SALT' }),
+    );
+    ledger.transient.set('appealResolution', resolutionDetails);
     const resolved = JSON.parse(
       await contract.ReviewAppeal(
         context(ledger, reviewer),
         submitted.appealId,
         'ACCEPTED',
-        sha256('resolution accepted'),
+        sha256(resolutionDetails),
       ),
     ) as AppealRecord;
     expect(resolved.status).toBe('RESOLVED_ACCEPTED');
+    expect(
+      ledger.privateState.get(
+        '_implicit_org_UniversityAMSP:appeal:appeal:2026:0001:resolution',
+      ),
+    ).toEqual(resolutionDetails);
   });
 
   it('does not let an identity from another organization appeal an issued credential', async () => {

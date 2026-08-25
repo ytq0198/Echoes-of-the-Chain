@@ -2,6 +2,8 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 
 import type { CredentialLedger } from './ledger/types.js';
+import { registerHttpErrorHandler } from './lib/http-errors.js';
+import { registerAppealRoutes } from './routes/appeals.js';
 import { registerCredentialRoutes } from './routes/credentials.js';
 
 interface AppOptions {
@@ -39,6 +41,8 @@ export function buildApp(options: AppOptions = {}) {
   }));
 
   void app.register(registerCredentialRoutes, options.ledger ? { ledger: options.ledger } : {});
+  void app.register(registerAppealRoutes, options.ledger ? { ledger: options.ledger } : {});
+  registerHttpErrorHandler(app);
 
   app.addHook('onClose', async () => {
     options.ledger?.close();

@@ -272,12 +272,20 @@ export class GradeContract extends Contract {
       throw new AcademicRecordError('INVALID_STATE', 'only an open appeal can be reviewed');
     }
 
+    const privateResolution = this.requiredTransient(ctx, 'appealResolution');
+    this.assertPayloadHash(privateResolution, resolutionHash, 'appealResolution');
+
     appeal.status = decision === 'ACCEPTED' ? 'RESOLVED_ACCEPTED' : 'RESOLVED_REJECTED';
     appeal.resolutionHash = resolutionHash;
     appeal.reviewedByIdentityHash = this.identityHash(ctx);
     appeal.updatedAt = this.transactionTime(ctx);
     appeal.transactionId = ctx.stub.getTxID();
     await ctx.stub.putState(this.appealKey(appealId), Buffer.from(JSON.stringify(appeal)));
+    await ctx.stub.putPrivateData(
+      this.privateCollection(ctx),
+      `${this.appealKey(appealId)}:resolution`,
+      privateResolution,
+    );
     return JSON.stringify(appeal);
   }
 

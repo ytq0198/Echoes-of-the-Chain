@@ -101,8 +101,9 @@ a { color: inherit; text-decoration: none; }
 .field { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 .field.wide { grid-column: 1 / -1; }
 .field label, .lookup-panel > label { color: #455049; font-size: 12px; font-weight: 700; }
-.field input, .field select, .lookup-row input { width: 100%; min-width: 0; height: 45px; padding: 0 13px; border: 1px solid #bdc4bd; border-radius: 2px; color: var(--ink); background: #fff; outline: 0; }
-.field input:focus, .field select:focus, .lookup-row input:focus { border-color: var(--green); box-shadow: 0 0 0 3px #0d664514; }
+.field input, .field select, .field textarea, .lookup-row input { width: 100%; min-width: 0; height: 45px; padding: 0 13px; border: 1px solid #bdc4bd; border-radius: 2px; color: var(--ink); background: #fff; outline: 0; }
+.field textarea { min-height: 105px; padding-block: 12px; resize: vertical; line-height: 1.65; }
+.field input:focus, .field select:focus, .field textarea:focus, .lookup-row input:focus { border-color: var(--green); box-shadow: 0 0 0 3px #0d664514; }
 .field small { color: #818881; font-size: 11px; line-height: 1.5; }
 .form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 20px; padding-top: 8px; }
 .form-actions span { color: var(--muted); font-size: 12px; }
@@ -122,6 +123,25 @@ a { color: inherit; text-decoration: none; }
 .status { display: inline-block; width: max-content; padding: 5px 8px; border: 1px solid currentColor; color: var(--green); font: 500 9px 'DM Mono', monospace; letter-spacing: .07em; }
 .status.pending, .status.pending_review { color: #a45e18; }
 .status.revoked { color: #aa3528; }
+.status.open { color: #a45e18; }
+.status.resolved_accepted { color: var(--green); }
+.status.resolved_rejected { color: #aa3528; }
+
+.operation-panel { grid-column: 2; align-self: start; padding: 30px 32px; border: 1px solid var(--ink); background: #fdfbf5; }
+.operation-heading { display: flex; justify-content: space-between; align-items: start; gap: 24px; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.operation-heading h3 { margin: 0; font-size: 23px; }
+.operation-heading > span { color: var(--muted); font-size: 11px; }
+.compact-form { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.compact-form > .button { justify-self: start; }
+.compact-form > .notice { align-self: center; }
+.mini-result { display: flex; align-items: center; gap: 14px; margin-top: 22px; padding: 17px; border: 1px solid #b9cbb8; background: #edf6eb; font-size: 12px; }
+.mini-result > span:not(.status) { color: var(--muted); }
+.mini-result .text-button { margin-left: auto; }
+.appeal-review-panel > .notice { margin-top: 14px; }
+.appeal-summary { margin-top: 22px; padding: 22px; border: 1px solid var(--line); background: white; }
+.appeal-summary > div { display: flex; align-items: center; gap: 14px; }
+.appeal-summary > p { color: var(--muted); font-size: 12px; }
+.appeal-summary .compact-form { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line); }
 
 .lookup-panel { margin-bottom: 24px; }
 .lookup-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 10px; }
@@ -178,7 +198,7 @@ a { color: inherit; text-decoration: none; }
   .metrics { margin-top: 15px; }
   .workspace, .verify-workspace { grid-template-columns: 1fr; gap: 35px; }
   .workspace-intro { position: static; }
-  .result-card, .verification-result { grid-column: 1; }
+  .result-card, .verification-result, .operation-panel { grid-column: 1; }
 }
 
 @media (max-width: 700px) {
@@ -203,6 +223,12 @@ a { color: inherit; text-decoration: none; }
   .form-panel, .lookup-panel, .review-sheet, .verify-panel { padding: 22px; }
   .form-panel { grid-template-columns: 1fr; }
   .field.wide, .form-actions { grid-column: 1; }
+  .operation-panel { padding: 22px; }
+  .operation-heading { flex-direction: column; gap: 10px; }
+  .compact-form { grid-template-columns: 1fr; }
+  .compact-form .wide { grid-column: 1; }
+  .mini-result { align-items: flex-start; flex-direction: column; }
+  .mini-result .text-button { margin-left: 0; }
   .form-actions { align-items: flex-start; flex-direction: column; }
   .lookup-row { grid-template-columns: 1fr; }
   .record-grid { grid-template-columns: 1fr; }

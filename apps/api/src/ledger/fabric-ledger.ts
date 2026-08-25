@@ -13,14 +13,16 @@ import {
   type Signer,
   signers,
 } from '@hyperledger/fabric-gateway';
-import type { PublicCredentialRecord } from '@chaingrade/shared';
+import type { PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
 
 import type { FabricConfig } from './fabric-config.js';
 import type {
   CreateCredentialCommand,
+  CreateAppealCommand,
   CredentialLedger,
   CredentialVerification,
   FabricActor,
+  ReviewAppealCommand,
 } from './types.js';
 
 interface ActorConnection {
@@ -55,6 +57,27 @@ export class FabricCredentialLedger implements CredentialLedger {
     return decodeJson<PublicCredentialRecord>(result);
   }
 
+  public async createAmendment(
+    previousCredentialId: string,
+    command: CreateCredentialCommand,
+  ): Promise<PublicCredentialRecord> {
+    const contract = await this.contractFor('issuer');
+    const result = await contract.submit('CreateAmendmentDraft', {
+      arguments: [
+        previousCredentialId,
+        JSON.stringify({
+          credentialId: command.credentialId,
+          subjectHash: command.subjectHash,
+          courseHash: command.courseHash,
+          detailHash: command.detailHash,
+          schemaVersion: command.schemaVersion,
+        }),
+      ],
+      transientData: { gradeDetails: command.privateDetails },
+    });
+    return decodeJson<PublicCredentialRecord>(result);
+  }
+
   public async approve(credentialId: string): Promise<PublicCredentialRecord> {
     const contract = await this.contractFor('reviewer');
     return decodeJson<PublicCredentialRecord>(
@@ -77,6 +100,29 @@ export class FabricCredentialLedger implements CredentialLedger {
     return decodeJson<CredentialVerification>(
       await contract.evaluateTransaction('VerifyCredential', credentialId, expectedDetailHash),
     );
+  }
+
+  public async submitAppeal(command: CreateAppealCommand): Promise<PublicAppealRecord> {
+    const contract = await this.contractFor('student');
+    const result = await contract.submit('SubmitAppeal', {
+      arguments: [command.appealId, command.credentialId, command.reasonHash],
+      transientData: { appealDetails: command.privateDetails },
+    });
+    return decodeJson<PublicAppealRecord>(result);
+  }
+
+  public async reviewAppeal(command: ReviewAppealCommand): Promise<PublicAppealRecord> {
+    const contract = await this.contractFor('reviewer');
+    const result = await contract.submit('ReviewAppeal', {
+      arguments: [command.appealId, command.decision, command.resolutionHash],
+      transientData: { appealResolution: command.privateResolution },
+    });
+    return decodeJson<PublicAppealRecord>(result);
+  }
+
+  public async readAppeal(appealId: string): Promise<PublicAppealRecord> {
+    const contract = await this.contractFor('reviewer');
+    return decodeJson<PublicAppealRecord>(await contract.evaluateTransaction('ReadAppeal', appealId));
   }
 
   public close(): void {
@@ -147,4 +193,3 @@ async function readFirstFile(directory: string): Promise<Buffer> {
 function decodeJson<T>(bytes: Uint8Array): T {
   return JSON.parse(decoder.decode(bytes)) as T;
 }
-

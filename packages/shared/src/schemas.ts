@@ -35,10 +35,37 @@ export const gradeDetailsSchema = z
   })
   .catchall(z.unknown());
 
+export const appealDetailsSchema = z.object({
+  reason: z.string().trim().min(10).max(2_000),
+  salt: z.string().min(16).max(256),
+  evidenceHash: sha256Schema.optional(),
+});
+
+export const appealResolutionDetailsSchema = z.object({
+  summary: z.string().trim().min(10).max(2_000),
+  salt: z.string().min(16).max(256),
+});
+
 export const createCredentialRequestSchema = z.object({
   credentialId: identifierSchema,
   subjectHash: sha256Schema,
   courseHash: sha256Schema,
   schemaVersion: z.string().regex(/^\d+\.\d+$/),
   details: gradeDetailsSchema,
+});
+
+export const createAmendmentRequestSchema = z.object({
+  credentialId: identifierSchema,
+  schemaVersion: z.string().regex(/^\d+\.\d+$/),
+  details: gradeDetailsSchema,
+});
+
+export const createAppealRequestSchema = z.object({
+  appealId: identifierSchema,
+  details: appealDetailsSchema,
+});
+
+export const reviewAppealRequestSchema = z.object({
+  decision: z.enum(['ACCEPTED', 'REJECTED']),
+  resolution: appealResolutionDetailsSchema,
 });

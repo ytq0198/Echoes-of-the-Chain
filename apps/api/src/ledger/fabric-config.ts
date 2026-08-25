@@ -39,7 +39,9 @@ export function loadFabricConfig(env: NodeJS.ProcessEnv = process.env): FabricCo
       reviewer:
         env.FABRIC_REVIEWER_MSP_PATH ??
         path.join(orgRoot, 'users', 'ChaingradeReviewer@org1.example.com', 'msp'),
+      student:
+        env.FABRIC_STUDENT_MSP_PATH ??
+        path.join(orgRoot, 'users', 'ChaingradeStudent@org1.example.com', 'msp'),
     },
   };
 }
-
