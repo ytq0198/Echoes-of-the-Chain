@@ -99,4 +99,25 @@ describe('appeal routes', () => {
     expect(response.json()).toMatchObject({ code: 'VALIDATION_ERROR' });
     await app.close();
   });
+
+  it('maps a Fabric peer detail to a stable business error', async () => {
+    const ledger = mockLedger();
+    vi.mocked(ledger.submitAppeal).mockRejectedValueOnce(
+      Object.assign(new Error('failed to endorse transaction'), {
+        details: [{ message: 'chaincode response 500, INVALID_STATE: only active records' }],
+      }),
+    );
+    const app = buildApp({ ledger });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/credentials/cred:2026:api01/appeals',
+      payload: {
+        appealId: 'appeal:2026:error01',
+        details: { reason: '请求复核当前成绩记录。', salt: 'APPEAL_ERROR_SALT_12345' },
+      },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ code: 'INVALID_STATE', message: '记录当前状态不允许此操作' });
+    await app.close();
+  });
 });

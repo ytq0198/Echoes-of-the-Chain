@@ -24,8 +24,7 @@ export function registerHttpErrorHandler(app: FastifyInstance): void {
       });
     }
 
-    const message = error instanceof Error ? error.message : String(error);
-    const code = extractDomainCode(message);
+    const code = extractDomainCode(errorMessages(error).join('\n'));
     if (code) {
       return reply.code(statusByCode[code] ?? 500).send({
         code,
@@ -35,6 +34,22 @@ export function registerHttpErrorHandler(app: FastifyInstance): void {
 
     return reply.code(500).send({ code: 'INTERNAL_ERROR', message: '服务暂时无法完成请求' });
   });
+}
+
+function errorMessages(error: unknown): string[] {
+  const messages = [error instanceof Error ? error.message : String(error)];
+  if (typeof error === 'object' && error !== null && 'details' in error) {
+    const details = (error as { details?: unknown }).details;
+    if (Array.isArray(details)) {
+      for (const detail of details) {
+        if (typeof detail === 'object' && detail !== null && 'message' in detail) {
+          const message = (detail as { message?: unknown }).message;
+          if (typeof message === 'string') messages.push(message);
+        }
+      }
+    }
+  }
+  return messages;
 }
 
 function extractDomainCode(message: string): string | undefined {
