@@ -190,7 +190,7 @@ export class GradeContract extends Contract {
   public async VerifyCredential(
     ctx: Context,
     credentialId: string,
-    expectedDetailHash = '',
+    expectedDetailHash: string,
   ): Promise<string> {
     const record = await this.readCredentialRecord(ctx, credentialId);
     if (expectedDetailHash) {

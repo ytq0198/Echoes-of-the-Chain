@@ -9,6 +9,8 @@ source "${SCRIPT_DIR}/versions.env"
 NETWORK_ROOT="${PROJECT_ROOT}/.tools/fabric-samples/test-network"
 NETWORK_SCRIPT="${NETWORK_ROOT}/network.sh"
 CHAINCODE_STAGE="${PROJECT_ROOT}/.tools/chaincode-stage/grade-contract"
+CHAINCODE_VERSION="${CHAINCODE_VERSION:-0.1}"
+CHAINCODE_SEQUENCE="${CHAINCODE_SEQUENCE:-1}"
 
 if [[ ! -x "${NETWORK_SCRIPT}" ]]; then
   echo "Fabric samples are missing. Run infra/fabric/bootstrap.sh first." >&2
@@ -36,7 +38,8 @@ case "${1:-}" in
     (cd "${NETWORK_ROOT}" && ./network.sh deployCC \
       -c "${CHANNEL_NAME}" -ccn "${CHAINCODE_NAME}" \
       -ccp "${CHAINCODE_STAGE}" -ccl typescript \
-      -ccv 0.1 -ccs 1 -ccep "OR('Org1MSP.peer','Org2MSP.peer')")
+      -ccv "${CHAINCODE_VERSION}" -ccs "${CHAINCODE_SEQUENCE}" \
+      -ccep "OR('Org1MSP.peer','Org2MSP.peer')")
     ;;
   down)
     (cd "${NETWORK_ROOT}" && ./network.sh down)

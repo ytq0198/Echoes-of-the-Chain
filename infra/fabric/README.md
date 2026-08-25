@@ -21,6 +21,12 @@ Run from the repository root on Linux:
 ./infra/fabric/network.sh status
 ```
 
+For an in-place chaincode upgrade, increment both lifecycle values, for example:
+
+```bash
+CHAINCODE_VERSION=0.2 CHAINCODE_SEQUENCE=2 ./infra/fabric/network.sh deploy
+```
+
 To stop and remove only this test network's generated containers and material:
 
 ```bash
