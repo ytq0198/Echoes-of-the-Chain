@@ -47,7 +47,8 @@ case "${1:-}" in
       compose_peer0.org2.example.com 2>/dev/null || true
     ;;
   status)
-    docker ps --filter 'label=com.docker.compose.project=fabric_test' \
+    docker ps --filter 'name=peer0.org' --filter 'name=orderer.example.com' \
+      --filter 'name=ca_org' --filter 'name=ca_orderer' --filter 'name=dev-peer0' \
       --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
     ;;
   *)
