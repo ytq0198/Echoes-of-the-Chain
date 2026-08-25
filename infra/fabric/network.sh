@@ -14,7 +14,7 @@ if [[ ! -x "${NETWORK_SCRIPT}" ]]; then
   exit 1
 fi
 
-export PATH="${PROJECT_ROOT}/.tools/fabric-samples/bin:${PATH}"
+export PATH="${PROJECT_ROOT}/.tools/bin:${PROJECT_ROOT}/.tools/fabric-samples/bin:${PATH}"
 export FABRIC_CFG_PATH="${PROJECT_ROOT}/.tools/fabric-samples/config"
 
 case "${1:-}" in
