@@ -19,7 +19,7 @@ export FABRIC_CFG_PATH="${PROJECT_ROOT}/.tools/fabric-samples/config"
 
 case "${1:-}" in
   up)
-    (cd "${NETWORK_ROOT}" && ./network.sh up createChannel -ca -s couchdb \
+    (cd "${NETWORK_ROOT}" && ./network.sh up createChannel -ca -s leveldb \
       -c "${CHANNEL_NAME}" -i "${FABRIC_VERSION}" -cai "${CA_VERSION}")
     "${SCRIPT_DIR}/enroll-identities.sh"
     ;;
