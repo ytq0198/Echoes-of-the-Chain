@@ -1,0 +1,22 @@
+{
+  "name": "echoes-of-the-chain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ChainGrade privacy-preserving academic credential platform on Hyperledger Fabric",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "check": "pnpm -r --if-present check",
+    "test": "pnpm -r --if-present test",
+    "test:coverage": "pnpm -r --if-present test:coverage",
+    "dev:api": "pnpm --filter @chaingrade/api dev",
+    "dev:web": "pnpm --filter @chaingrade/web dev"
+  },
+  "devDependencies": {
+    "prettier": "3.9.6",
+    "typescript": "5.9.3"
+  }
+}

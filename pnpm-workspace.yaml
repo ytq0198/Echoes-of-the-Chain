@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+  - chaincode/*
+
+allowBuilds:
+  esbuild: true
+  protobufjs: true
