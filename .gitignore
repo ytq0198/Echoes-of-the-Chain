@@ -1,0 +1,22 @@
+# Local course materials supplied outside the project repository
+/区块链技术应用实践大程要求.pdf
+/参考选题.pdf
+
+# Research and rendering scratch files
+/tmp/
+
+# Local secrets and runtime state
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+coverage/
+*.log
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
