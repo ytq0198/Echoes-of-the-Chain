@@ -52,3 +52,26 @@
 - 已改用每组织隐式私有集合，避免模拟高校之间默认共享成绩明文。
 - 本地类型检查、测试、生产构建及桌面/移动浏览器渲染均通过。
 - 学校服务器项目专属运行时复验通过；因服务器到 GitHub 临时网络超时，本轮使用 Git bundle 经 SSH 快进同步。
+
+## 2026-08-25：真实 Fabric 与 Gateway 垂直闭环
+
+### 已完成
+
+- 在服务器项目目录内固定 Fabric 2.5.16 LTS、Fabric CA 1.5.17、jq 1.7.1 与 samples commit。
+- 建立双组织 Raft/LevelDB 开发网络和 `chaingrade` 通道，签发 issuer、reviewer、student 属性证书。
+- 使用隔离 staging 打包 TypeScript 链码，完成双组织安装、批准、commit 与一次链码升级。
+- 实现 Fastify 到 Fabric Gateway 的成绩提交、复核、读取和验真路径。
+- 真实提交 `cred:2026:real01`，复核后状态为 `ACTIVE`；正确哈希验真为 true，错误哈希为 false。
+- 服务器与本地全量类型检查、18 项测试和生产构建通过。
+
+### 关键修复
+
+- 明确拉取并本地标记固定版本镜像，避免 samples 的 `latest` 漂移。
+- 将 jq、Node、pnpm 全部限制在项目 `.tools/`，不修改服务器系统环境。
+- 隔离 pnpm workspace 链接，避免链码容器缺失 `fabric-chaincode-node`。
+- 删除链码公开交易参数的默认值，修复 Fabric Contract API 运行时参数反射。
+
+### 下一步
+
+- 实现教师、复核员、学生和公开验证者的 Web 应用壳与真实 API 对接。
+- 将修订/申诉链码能力接入 Gateway API，并补充身份会话与结构化错误映射。

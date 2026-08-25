@@ -27,13 +27,14 @@ export function buildApp(options: AppOptions = {}) {
   app.get('/api/v1/meta', async () => ({
     product: 'ChainGrade',
     repository: 'Echoes-of-the-Chain',
-    phase: 'iteration-0',
+    phase: 'iteration-1',
     capabilities: [
       'credential-draft',
       'independent-review',
       'immutable-amendment',
       'revocation',
       'appeal',
+      'fabric-gateway',
     ],
   }));
 
