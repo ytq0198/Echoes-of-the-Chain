@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import type { PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
+import {
+  PhArrowRight, PhBookOpenText, PhCertificate, PhCheckCircle, PhFileText,
+  PhGlobe, PhGraduationCap, PhLink, PhLockKey, PhMagnifyingGlass,
+  PhShieldCheck, PhStudent, PhUserCircle, PhUsersThree,
+} from '@phosphor-icons/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 type View = 'home' | 'issuer' | 'reviewer' | 'student' | 'verify';
@@ -35,7 +40,7 @@ const authRequired = ref(true);
 const session = ref<SessionView>({ authenticated: false });
 const loginState = ref<RequestState>('idle');
 const loginMessage = ref('');
-const loginForm = ref({ username: 'demo-issuer', password: '' });
+const loginForm = ref({ username: '', password: '' });
 
 const issuerState = ref<RequestState>('idle');
 const issuerMessage = ref('');
@@ -70,7 +75,7 @@ const verifyState = ref<RequestState>('idle');
 const verifyMessage = ref('');
 const verification = ref<VerificationResult>();
 
-const viewLabel = computed(() => ({ home: '项目总览', issuer: '教师签发台', reviewer: '复核工作台', student: '学生凭证夹', verify: '公开验真' })[currentView.value]);
+const viewLabel = computed(() => ({ home: '可信成绩工作台', issuer: '教师签发', reviewer: '独立复核', student: '学生凭证', verify: '公开验真' })[currentView.value]);
 const requiredRole = computed<AppRole | undefined>(() => ({ issuer: 'issuer', reviewer: 'reviewer', student: 'student' } as Partial<Record<View, AppRole>>)[currentView.value]);
 const sessionMatchesView = computed(() => !authRequired.value || !requiredRole.value || (session.value.authenticated && session.value.role === requiredRole.value));
 
@@ -78,7 +83,7 @@ function viewFromHash(): View {
   const candidate = window.location.hash.replace(/^#\/?/, '') as View;
   return views.includes(candidate) ? candidate : 'home';
 }
-function syncHash(): void { currentView.value = viewFromHash(); mobileMenuOpen.value = false; if (!session.value.authenticated && requiredRole.value) loginForm.value.username = `demo-${requiredRole.value}`; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function syncHash(): void { currentView.value = viewFromHash(); mobileMenuOpen.value = false; window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function openView(view: View): void { window.location.hash = `#${view}`; }
 function scrollToAppeal(): void { document.getElementById('appeal-form')?.scrollIntoView({ behavior: 'smooth' }); }
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -106,7 +111,7 @@ async function login(): Promise<void> {
 }
 async function logout(): Promise<void> {
   try { await requestJson<SessionView>('/api/v1/auth/logout', { method: 'POST' }); }
-  finally { session.value = { authenticated: false }; loginForm.value.username = requiredRole.value ? `demo-${requiredRole.value}` : 'demo-student'; }
+  finally { session.value = { authenticated: false }; loginForm.value.username = ''; }
 }
 
 async function submitCredential(): Promise<void> {
@@ -167,40 +172,63 @@ async function verifyCredential(): Promise<void> {
 }
 function shortHash(value: string): string { return `${value.slice(0, 10)} ··· ${value.slice(-8)}`; }
 function formatTime(value: string): string { return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)); }
-onMounted(() => { currentView.value = viewFromHash(); if (requiredRole.value) loginForm.value.username = `demo-${requiredRole.value}`; void loadSession(); window.addEventListener('hashchange', syncHash); });
+onMounted(() => { currentView.value = viewFromHash(); void loadSession(); window.addEventListener('hashchange', syncHash); });
 onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
 </script>
 
 <template>
   <main>
-    <nav class="nav shell" aria-label="主导航">
-      <a class="brand" href="#home" aria-label="ChainGrade 首页"><span class="brand-mark" aria-hidden="true">CG</span><span>ChainGrade</span></a>
-      <div class="desktop-nav"><a href="#issuer">教师签发</a><a href="#reviewer">独立复核</a><a href="#student">学生凭证</a><a class="nav-verify" href="#verify">公开验真</a></div>
-      <div v-if="authRequired && session.authenticated" class="session-nav"><span>{{ session.role }}</span><b>{{ session.username }}</b><button type="button" @click="logout">退出</button></div>
+    <nav class="nav" aria-label="主导航">
+      <a class="brand" href="#home" aria-label="ChainGrade 首页"><span class="brand-mark" aria-hidden="true"><PhShieldCheck :size="20" weight="fill" /></span><span>ChainGrade</span></a>
+      <div class="network-state"><span></span>真实 Fabric 账本已连接</div>
+      <div class="desktop-nav"><a href="#issuer">教师签发</a><a href="#reviewer">独立复核</a><a href="#student">学生凭证</a><a class="nav-verify" href="#verify"><PhMagnifyingGlass :size="17" />公开验真</a></div>
+      <div v-if="authRequired && session.authenticated" class="session-nav"><PhUserCircle :size="18" /><span>{{ session.role }}</span><b>{{ session.username }}</b><button type="button" @click="logout">退出</button></div>
       <button class="menu-button" type="button" aria-label="切换导航" @click="mobileMenuOpen = !mobileMenuOpen">{{ mobileMenuOpen ? '关闭' : '菜单' }}</button>
       <div v-if="mobileMenuOpen" class="mobile-nav"><a href="#issuer">教师签发</a><a href="#reviewer">独立复核</a><a href="#student">学生凭证</a><a href="#verify">公开验真</a></div>
     </nav>
 
     <template v-if="currentView === 'home'">
-      <section class="hero shell">
-        <div class="hero-copy"><div class="live-chip"><span></span> FABRIC 2.5 LTS · REAL LEDGER CONNECTED</div><p class="eyebrow">ECHOES OF THE CHAIN</p><h1>成绩可信，<br /><span>披露有界。</span></h1><p class="lead">同一个项目贯通课程答辩与竞赛深化。教师提交、院系复核、学生持有和公开验真，都在一条可追溯的证据链上。</p><div class="hero-actions"><button class="button primary" type="button" @click="openView('issuer')">进入角色工作台</button><button class="button secondary" type="button" @click="openView('verify')">立即公开验真</button></div></div>
-        <aside class="proof-card" aria-label="真实凭证状态示例"><div class="proof-topline"><span>ACADEMIC CREDENTIAL</span><span class="active-dot">● ACTIVE</span></div><div class="proof-seal">✓</div><p class="proof-label">区块链技术与应用</p><p class="proof-title">已通过可信机构复核</p><dl><div><dt>公开账本</dt><dd>状态与哈希承诺</dd></div><div><dt>精确成绩</dt><dd>隐式私有集合</dd></div><div><dt>当前版本</dt><dd>v1 · ACTIVE</dd></div></dl><div class="hash-line">tx 52ddff39 ··· b7fd9b5a4</div></aside>
-      </section>
-      <section class="role-section shell" aria-labelledby="role-heading"><div class="section-heading"><div><p class="eyebrow">ONE PRODUCT · FOUR VIEWS</p><h2 id="role-heading">每个角色，只看到应当看到的。</h2></div><p>角色分离不是界面装饰，而是由 Fabric CA 属性证书和链码权限共同约束。</p></div><div class="role-grid">
-        <button type="button" class="role-card issuer-card" @click="openView('issuer')"><span>01 / ISSUER</span><h3>教师签发台</h3><p>录入成绩详情，以 transient data 提交，明文不进入公共状态。</p><b>创建成绩草稿 →</b></button>
-        <button type="button" class="role-card" @click="openView('reviewer')"><span>02 / REVIEWER</span><h3>独立复核台</h3><p>核对公共承诺与业务信息，提交者无法用同一证书自审。</p><b>查看待复核 →</b></button>
-        <button type="button" class="role-card" @click="openView('student')"><span>03 / STUDENT</span><h3>学生凭证夹</h3><p>查看凭证当前状态、版本与更新时间，为后续申诉和披露授权提供入口。</p><b>查看我的凭证 →</b></button>
-        <button type="button" class="role-card verify-card" @click="openView('verify')"><span>04 / VERIFIER</span><h3>公开验真</h3><p>无需接触成绩明文，以凭证标识和哈希判断真实性与有效性。</p><b>验证一份凭证 →</b></button>
-      </div></section>
-      <section class="evidence-section"><div class="shell evidence-grid"><div><p class="eyebrow light">VERIFIED ON REAL FABRIC</p><h2>不是原型截图，<br />是真实交易闭环。</h2></div><dl class="metrics"><div><dt>32</dt><dd>自动测试</dd></div><div><dt>91.35%</dt><dd>链码语句覆盖率</dd></div><div><dt>3</dt><dd>属性身份角色</dd></div><div><dt>23</dt><dd>E2E 后账本高度</dd></div></dl></div></section>
+      <div class="dashboard-shell">
+        <aside class="side-nav" aria-label="工作台导航">
+          <div class="side-group"><p>工作台</p><a class="active" href="#home"><PhFileText :size="20" />可信成绩工作台</a></div>
+          <div class="side-group"><p>工作流程</p><a href="#issuer"><PhGraduationCap :size="20" />教师签发</a><a href="#reviewer"><PhShieldCheck :size="20" />独立复核</a><a href="#student"><PhStudent :size="20" />学生凭证</a><a href="#verify"><PhMagnifyingGlass :size="20" />公开验真</a></div>
+          <div class="side-group"><p>信任与规则</p><a href="#home"><PhBookOpenText :size="20" />机制说明</a><a href="#home"><PhUsersThree :size="20" />节点与机构</a><a href="#home"><PhLockKey :size="20" />隐私与公开</a></div>
+          <dl class="ledger-status"><div><dt>账本状态</dt><dd><span></span>正常</dd></div><div><dt>网络</dt><dd>Fabric 2.5 LTS</dd></div><div><dt>通道</dt><dd class="mono">chaingrade</dd></div><div><dt>链码</dt><dd class="mono">grade 0.4</dd></div><div><dt>区块高度</dt><dd>23</dd></div><div><dt>节点</dt><dd>Org1 / Org2</dd></div></dl>
+        </aside>
+
+        <section class="dashboard-main">
+          <header class="dashboard-heading"><div><h1>可信成绩工作台</h1><p>凭证签发、复核与验证记录</p></div><div class="dashboard-actions"><button class="button primary" type="button" @click="openView('verify')"><PhMagnifyingGlass :size="18" />公开验真</button><button class="button secondary" type="button" @click="openView('student')"><PhLink :size="18" />查看链上证据</button></div></header>
+
+          <dl class="trust-summary">
+            <div><PhCheckCircle :size="28" weight="duotone" /><span><dt>凭证状态</dt><dd>已通过独立复核</dd><small>当前状态：ACTIVE</small></span></div>
+            <div><PhGlobe :size="28" weight="duotone" /><span><dt>公开状态</dt><dd>私有成绩</dd><small>隐式私有集合</small></span></div>
+            <div><PhFileText :size="28" weight="duotone" /><span><dt>教师签发</dt><dd>签发完成</dd><small>1 项凭证</small></span></div>
+            <div><PhShieldCheck :size="28" weight="duotone" /><span><dt>独立复核</dt><dd>复核完成</dd><small>1 项复核</small></span></div>
+            <div><PhUserCircle :size="28" weight="duotone" /><span><dt>学生凭证</dt><dd>学生持有</dd><small>本人属性约束</small></span></div>
+          </dl>
+
+          <section class="evidence-ledger" aria-labelledby="evidence-heading">
+            <div class="table-heading"><div><h2 id="evidence-heading">证据链状态</h2><p>公共状态可审计，成绩详情保留在授权范围内。</p></div><span>当前记录</span></div>
+            <div class="evidence-table" role="table" aria-label="链上证据状态">
+              <div class="evidence-row header" role="row"><span>记录</span><span>阶段</span><span>状态</span><span>隐私范围</span><span>链上证据</span></div>
+              <button class="evidence-row" type="button" role="row" @click="openView('student')"><span class="mono">cred:2026:web01-v2</span><span><PhCertificate :size="19" />凭证修订</span><span><b class="status active">ACTIVE</b><small>版本 v2</small></span><span>隐式私有集合</span><span class="mono">height 23 <PhArrowRight :size="16" /></span></button>
+              <button class="evidence-row" type="button" role="row" @click="openView('student')"><span class="mono">cred:2026:web01</span><span><PhFileText :size="19" />历史版本</span><span><b class="status superseded">SUPERSEDED</b><small>由 v2 替代</small></span><span>公共状态</span><span class="mono">可追溯 <PhArrowRight :size="16" /></span></button>
+              <button class="evidence-row" type="button" role="row" @click="openView('reviewer')"><span class="mono">appeal:2026:web01</span><span><PhShieldCheck :size="19" />申诉复核</span><span><b class="status resolved_accepted">ACCEPTED</b><small>复核已完成</small></span><span>理由与结论私有</span><span class="mono">哈希承诺 <PhArrowRight :size="16" /></span></button>
+              <button class="evidence-row" type="button" role="row" @click="openView('verify')"><span class="mono">cred:2026:real01</span><span><PhGlobe :size="19" />公开验真</span><span><b class="status active">VERIFIED</b><small>哈希一致</small></span><span>公开哈希</span><span class="mono">52ddff39… <PhArrowRight :size="16" /></span></button>
+            </div>
+          </section>
+
+          <aside class="privacy-note"><PhLockKey :size="20" weight="fill" /><p><b>隐私说明</b> 成绩详情与申诉材料存储于隐式私有集合，仅授权方可见；公共账本只保留哈希、状态与审计元数据。</p><button type="button" @click="openView('verify')">了解公开验真规则<PhArrowRight :size="16" /></button></aside>
+        </section>
+      </div>
     </template>
 
     <template v-else>
-      <header class="workspace-header shell"><div><p class="eyebrow">CHAIN GRADE WORKSPACE</p><h1>{{ viewLabel }}</h1></div><span class="phase-badge">Iteration 3 · 会话授权</span></header>
-      <section v-if="!sessionMatchesView" class="auth-gate shell"><div><span class="role-token">SECURE SESSION</span><h2>{{ session.authenticated ? '当前角色与工作台不匹配' : '登录后进入角色工作台' }}</h2><p>Cookie 仅供浏览器自动携带，JavaScript 无法读取；状态变更还必须通过同源与 CSRF 令牌校验。</p><p v-if="session.authenticated" class="notice error">当前会话为 {{ session.role }}，本页面要求 {{ requiredRole }}。登录新账号将安全替换当前会话。</p></div><form class="auth-form" @submit.prevent="login"><div class="field"><label for="login-username">演示账号</label><input id="login-username" v-model="loginForm.username" autocomplete="username" required /></div><div class="field"><label for="login-password">密码</label><input id="login-password" v-model="loginForm.password" type="password" autocomplete="current-password" required /></div><button class="button primary" :disabled="loginState === 'loading'">{{ loginState === 'loading' ? '正在建立会话…' : '安全登录' }}</button><p v-if="loginMessage" class="notice" :class="loginState">{{ loginMessage }}</p><small>仓库不包含密码。演示凭据由服务器环境变量注入，会话默认 1 小时后失效。</small></form></section>
+      <header class="workspace-header shell"><div><p class="eyebrow">CHAIN GRADE</p><h1>{{ viewLabel }}</h1></div><span class="phase-badge">Fabric 2.5 LTS · 授权访问</span></header>
+      <section v-if="!sessionMatchesView" class="auth-gate shell"><div><span class="role-token">SECURE SESSION</span><h2>{{ session.authenticated ? '当前角色与工作台不匹配' : '登录后进入角色工作台' }}</h2><p>Cookie 仅供浏览器自动携带，JavaScript 无法读取；状态变更还必须通过同源与 CSRF 令牌校验。</p><p v-if="session.authenticated" class="notice error">当前会话为 {{ session.role }}，本页面要求 {{ requiredRole }}。登录新账号将安全替换当前会话。</p></div><form class="auth-form" @submit.prevent="login"><div class="field"><label for="login-username">账号</label><input id="login-username" v-model="loginForm.username" autocomplete="username" placeholder="输入账号" required /></div><div class="field"><label for="login-password">密码</label><input id="login-password" v-model="loginForm.password" type="password" autocomplete="current-password" placeholder="输入密码" required /></div><button class="button primary" :disabled="loginState === 'loading'">{{ loginState === 'loading' ? '正在建立会话…' : '安全登录' }}</button><p v-if="loginMessage" class="notice" :class="loginState">{{ loginMessage }}</p><small>凭据由服务端安全配置，会话默认 1 小时后失效。</small></form></section>
       <section v-else-if="currentView === 'issuer'" class="workspace shell">
         <div class="workspace-intro"><span class="role-token">ISSUER</span><h2>创建待复核成绩草稿</h2><p>成绩详情会先规范化并计算 SHA-256，再通过 transient data 进入签发组织的隐式私有集合。</p></div>
-        <form class="form-panel" @submit.prevent="submitCredential"><div class="field wide"><label for="credential-id">凭证标识</label><input id="credential-id" v-model="issuerForm.credentialId" required /></div><div class="field"><label for="course-name">课程名称</label><input id="course-name" v-model="issuerForm.courseName" required /></div><div class="field"><label for="score">成绩</label><input id="score" v-model.number="issuerForm.score" type="number" min="0" max="100" required /></div><div class="field"><label for="grade">等级</label><select id="grade" v-model="issuerForm.grade"><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select></div><div class="field"><label for="schema-version">Schema 版本</label><input id="schema-version" v-model="issuerForm.schemaVersion" required /></div><div class="field wide"><label for="subject-hash">学生匿名标识（SHA-256）</label><input id="subject-hash" v-model="issuerForm.subjectHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="course-hash">课程标识（SHA-256）</label><input id="course-hash" v-model="issuerForm.courseHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="salt">隐私盐值</label><input id="salt" v-model="issuerForm.salt" class="mono" minlength="16" required /><small>演示数据使用固定合成盐；正式环境必须使用安全随机值。</small></div><div class="form-actions"><button class="button primary" :disabled="issuerState === 'loading'">{{ issuerState === 'loading' ? '正在提交…' : '提交至 Fabric' }}</button><span>复核前状态为 PENDING_REVIEW</span></div><p v-if="issuerMessage" class="notice" :class="issuerState">{{ issuerMessage }}</p></form>
+        <form class="form-panel" @submit.prevent="submitCredential"><div class="field wide"><label for="credential-id">凭证标识</label><input id="credential-id" v-model="issuerForm.credentialId" required /></div><div class="field"><label for="course-name">课程名称</label><input id="course-name" v-model="issuerForm.courseName" required /></div><div class="field"><label for="score">成绩</label><input id="score" v-model.number="issuerForm.score" type="number" min="0" max="100" required /></div><div class="field"><label for="grade">等级</label><select id="grade" v-model="issuerForm.grade"><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select></div><div class="field"><label for="schema-version">Schema 版本</label><input id="schema-version" v-model="issuerForm.schemaVersion" required /></div><div class="field wide"><label for="subject-hash">学生匿名标识（SHA-256）</label><input id="subject-hash" v-model="issuerForm.subjectHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="course-hash">课程标识（SHA-256）</label><input id="course-hash" v-model="issuerForm.courseHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="salt">隐私盐值</label><input id="salt" v-model="issuerForm.salt" class="mono" minlength="16" required /><small>生产环境必须使用安全随机值，且不得与成绩明文一同公开。</small></div><div class="form-actions"><button class="button primary" :disabled="issuerState === 'loading'">{{ issuerState === 'loading' ? '正在提交…' : '提交至 Fabric' }}</button><span>复核前状态为 PENDING_REVIEW</span></div><p v-if="issuerMessage" class="notice" :class="issuerState">{{ issuerMessage }}</p></form>
         <article v-if="issuedRecord" class="result-card"><div><span class="status pending">{{ issuedRecord.status }}</span><h3>{{ issuedRecord.credentialId }}</h3></div><dl><div><dt>详情承诺</dt><dd class="mono">{{ shortHash(issuedRecord.detailHash) }}</dd></div><div><dt>交易 ID</dt><dd class="mono">{{ shortHash(issuedRecord.transactionId) }}</dd></div></dl><button class="text-button" @click="openView('reviewer')">交给复核员 →</button></article>
         <section class="operation-panel"><div class="operation-heading"><div><p class="eyebrow">IMMUTABLE AMENDMENT</p><h3>创建不可覆盖的修订版本</h3></div><span>旧版本保持可审计</span></div><form class="compact-form" @submit.prevent="submitAmendment"><div class="field"><label for="previous-id">原凭证标识</label><input id="previous-id" v-model="amendmentForm.previousCredentialId" required /></div><div class="field"><label for="amended-id">新版本标识</label><input id="amended-id" v-model="amendmentForm.credentialId" required /></div><div class="field"><label for="amended-score">修订成绩</label><input id="amended-score" v-model.number="amendmentForm.score" type="number" min="0" max="100" required /></div><div class="field"><label for="amended-grade">修订等级</label><select id="amended-grade" v-model="amendmentForm.grade"><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select></div><div class="field wide"><label for="amended-course">课程名称</label><input id="amended-course" v-model="amendmentForm.courseName" required /></div><div class="field wide"><label for="amended-salt">新版本隐私盐值</label><input id="amended-salt" v-model="amendmentForm.salt" class="mono" minlength="16" required /></div><button class="button primary" :disabled="amendmentState === 'loading'">{{ amendmentState === 'loading' ? '正在创建…' : '创建修订草稿' }}</button><p v-if="amendmentMessage" class="notice" :class="amendmentState">{{ amendmentMessage }}</p></form><article v-if="amendedRecord" class="mini-result"><span class="status pending_review">{{ amendedRecord.status }}</span><b>{{ amendedRecord.credentialId }}</b><span>v{{ amendedRecord.version }} · previous {{ amendedRecord.previousCredentialId }}</span><button class="text-button" @click="openView('reviewer')">转交复核 →</button></article></section>
       </section>
@@ -223,6 +251,6 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
         <article v-if="verification" class="verification-result" :class="{ authentic: verification.authentic && verification.valid, invalid: !verification.authentic || !verification.valid }"><div class="verification-icon">{{ verification.authentic && verification.valid ? '✓' : '!' }}</div><div><p>{{ verification.authentic && verification.valid ? 'VERIFIED ON CHAIN' : 'VERIFICATION WARNING' }}</p><h3>{{ verification.authentic && verification.valid ? '凭证真实且当前有效' : '凭证未通过完整验证' }}</h3><span>{{ verification.authentic ? '哈希匹配' : '哈希不匹配' }} · {{ verification.valid ? '状态有效' : `状态 ${verification.status}` }}</span></div><dl><div><dt>签发组织</dt><dd>{{ verification.issuerMspId }}</dd></div><div><dt>当前版本</dt><dd>v{{ verification.version }}</dd></div><div><dt>审计交易</dt><dd class="mono">{{ shortHash(verification.transactionId) }}</dd></div></dl></article>
       </section>
     </template>
-    <footer class="footer shell"><div class="brand"><span class="brand-mark">CG</span><span>ChainGrade</span></div><p>课程答辩与 CCF 竞赛 · 同一个持续演进项目</p><a href="#home">返回总览 ↑</a></footer>
+    <footer class="footer"><div class="brand"><span class="brand-mark"><PhShieldCheck :size="17" weight="fill" /></span><span>ChainGrade</span></div><p>Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.4 <span>·</span> 区块高度 23</p><a href="#home">返回工作台</a></footer>
   </main>
 </template>
