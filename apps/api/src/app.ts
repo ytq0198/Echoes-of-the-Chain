@@ -1,7 +1,14 @@
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 
-export function buildApp() {
+import type { CredentialLedger } from './ledger/types.js';
+import { registerCredentialRoutes } from './routes/credentials.js';
+
+interface AppOptions {
+  ledger?: CredentialLedger;
+}
+
+export function buildApp(options: AppOptions = {}) {
   const app = Fastify({
     logger: false,
     bodyLimit: 1024 * 1024,
@@ -29,6 +36,12 @@ export function buildApp() {
       'appeal',
     ],
   }));
+
+  void app.register(registerCredentialRoutes, options.ledger ? { ledger: options.ledger } : {});
+
+  app.addHook('onClose', async () => {
+    options.ledger?.close();
+  });
 
   return app;
 }

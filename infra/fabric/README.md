@@ -1,0 +1,31 @@
+# ChainGrade Fabric development network
+
+This directory provisions the real ledger used by both the course-delivery milestone and the competition milestone. It is one product and one repository; the official Fabric test network is only the current development topology.
+
+## Pinned stack
+
+- Hyperledger Fabric 2.5.16 LTS
+- Fabric CA 1.5.17
+- Fabric samples commit recorded in `versions.env`
+- Two peer organizations, Raft ordering, CouchDB, channel `chaingrade`
+
+## Commands
+
+Run from the repository root on Linux:
+
+```bash
+./infra/fabric/bootstrap.sh
+./infra/fabric/network.sh up
+./infra/fabric/network.sh deploy
+./infra/fabric/network.sh status
+```
+
+To stop and remove only this test network's generated containers and material:
+
+```bash
+./infra/fabric/network.sh down
+```
+
+`up` also enrolls three development identities (issuer, reviewer, and student) with certificate attributes. Their fixed passwords and the official test-network CA are strictly for local/server demonstrations, never production deployment.
+
+The development endorsement policy is `OR('Org1MSP.peer','Org2MSP.peer')`. This permits an Org1 issuer to write its implicit private collection without disclosing the private grade payload to Org2. The competition topology will replace this with per-record/state-based endorsement and organization-specific access policies.

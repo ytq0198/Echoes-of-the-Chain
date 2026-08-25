@@ -5,4 +5,5 @@ packages:
 
 allowBuilds:
   esbuild: true
+  pkcs11js: false
   protobufjs: true

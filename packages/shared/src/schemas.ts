@@ -28,3 +28,17 @@ export const appealSubmissionSchema = z.object({
   credentialId: identifierSchema,
   reasonHash: sha256Schema,
 });
+
+export const gradeDetailsSchema = z
+  .object({
+    salt: z.string().min(16).max(256),
+  })
+  .catchall(z.unknown());
+
+export const createCredentialRequestSchema = z.object({
+  credentialId: identifierSchema,
+  subjectHash: sha256Schema,
+  courseHash: sha256Schema,
+  schemaVersion: z.string().regex(/^\d+\.\d+$/),
+  details: gradeDetailsSchema,
+});
