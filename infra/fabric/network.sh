@@ -31,6 +31,7 @@ case "${1:-}" in
       "${PROJECT_ROOT}/chaincode/grade-contract/package-lock.json" \
       "${PROJECT_ROOT}/chaincode/grade-contract/tsconfig.json" \
       "${CHAINCODE_STAGE}/"
+    cp "${PROJECT_ROOT}/tsconfig.base.json" "${PROJECT_ROOT}/.tools/tsconfig.base.json"
     cp -R "${PROJECT_ROOT}/chaincode/grade-contract/src" "${CHAINCODE_STAGE}/src"
     (cd "${NETWORK_ROOT}" && ./network.sh deployCC \
       -c "${CHANNEL_NAME}" -ccn "${CHAINCODE_NAME}" \
