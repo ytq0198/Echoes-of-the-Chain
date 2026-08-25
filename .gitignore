@@ -12,6 +12,7 @@
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
 *.log
 
 # IDE and OS files
@@ -19,4 +20,3 @@ coverage/
 .vscode/
 .DS_Store
 Thumbs.db
-
