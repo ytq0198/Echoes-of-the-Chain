@@ -172,3 +172,14 @@
 - 链码最终升级为 `grade 0.6 / sequence 6`，Org1/Org2 均安装、批准并查询到一致定义。
 - reviewer 真实读取 2 条 ACTIVE；student 真实读取 3 条本人凭证和 1 条已接受申诉；student 调 reviewer 队列被链码拒绝。
 - 教师、复核员、学生桌面端和 390×844 移动端通过浏览器视觉验收，7 张截图写入 `reports/09_role_scoped_ledger_queues_e2e.md`。
+
+## 2026-08-26：私有驳回与撤销闭环
+
+- 为待复核凭证增加驳回、为有效凭证增加撤销，完成批准/驳回/撤销状态机。
+- 复核决定正文通过 transient data 写入 reviewer 所在组织隐式私有集合，公共账本只记录 SHA-256 理由承诺。
+- API 增加 reviewer 会话、同源和 CSRF 保护的决定路由；链码再次校验 transient 内容与公开哈希一致。
+- 链码升级为 `grade 0.7 / sequence 7`，Org1/Org2 均批准且两个 peer 定义一致。
+- 真实完成 `cred:2026:reject-e2e07` 驳回和 `cred:2026:revoke-e2e07` 激活后撤销；重复撤销返回 409，公共结果不包含理由明文。
+- 37 项自动测试、类型检查和 Web 构建通过。
+- 桌面端驳回/撤销审计与 390×844 移动端撤销表单通过视觉验收，无横向溢出、浏览器 console warning/error 为 0。
+- 完整证据与截图写入 `reports/10_private_credential_decisions_e2e.md`。
