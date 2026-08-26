@@ -54,9 +54,15 @@ importers:
       '@chaingrade/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@fontsource-variable/noto-serif-sc':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@phosphor-icons/vue':
         specifier: 2.2.1
         version: 2.2.1(vue@3.5.41(typescript@5.9.3))
+      qrcode.vue:
+        specifier: ^3.10.0
+        version: 3.10.0(vue@3.5.41(typescript@5.9.3))
       vue:
         specifier: 3.5.41
         version: 3.5.41(typescript@5.9.3)
@@ -323,6 +329,9 @@ packages:
   '@fidm/x509@1.2.1':
     resolution: {integrity: sha512-nwc2iesjyc9hkuzcrMCBXQRn653XuAUKorfWM8PZyJawiy1QzLj4vahwzaI25+pfpwOLvMzbJ0uKpWLDNmo16w==}
     engines: {node: '>= 8'}
+
+  '@fontsource-variable/noto-serif-sc@5.3.0':
+    resolution: {integrity: sha512-7LcN2NEf4HDjoSkGWc79WqDDyMK8JvSPdA/gsHjJpZ8l9A9mcK/GQTazp3klmkBwJooy0eqeNvlmaZFXPupHrA==}
 
   '@grpc/grpc-js@1.14.4':
     resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
@@ -1044,6 +1053,11 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
+  qrcode.vue@3.10.0:
+    resolution: {integrity: sha512-1bjeBds9hRKMszZuBuYQZor9HdJYWtb0S44HG1JofZ9uicpJpdF+TtDvqo3+2ZlH0k80WVIkmiKB4hq0/N6/rA==}
+    peerDependencies:
+      vue: ^3.0.0
+
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
@@ -1467,6 +1481,8 @@ snapshots:
     dependencies:
       '@fidm/asn1': 1.0.4
       tweetnacl: 1.0.3
+
+  '@fontsource-variable/noto-serif-sc@5.3.0': {}
 
   '@grpc/grpc-js@1.14.4':
     dependencies:
@@ -2177,6 +2193,10 @@ snapshots:
       long: 5.3.2
 
   punycode@2.3.1: {}
+
+  qrcode.vue@3.10.0(vue@3.5.41(typescript@5.9.3)):
+    dependencies:
+      vue: 3.5.41(typescript@5.9.3)
 
   quick-format-unescaped@4.0.4: {}
 

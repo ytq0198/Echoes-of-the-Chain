@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@chaingrade/shared": "workspace:*",
+    "@fontsource-variable/noto-serif-sc": "^5.3.0",
     "@phosphor-icons/vue": "2.2.1",
+    "qrcode.vue": "^3.10.0",
     "vue": "3.5.41"
   },
   "devDependencies": {
