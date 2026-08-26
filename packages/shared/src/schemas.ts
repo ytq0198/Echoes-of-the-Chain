@@ -70,6 +70,11 @@ export const reviewAppealRequestSchema = z.object({
   resolution: appealResolutionDetailsSchema,
 });
 
+export const credentialDecisionRequestSchema = z.object({
+  reason: z.string().trim().min(10).max(2_000),
+  salt: z.string().min(16).max(256),
+});
+
 export const ledgerPageQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
   bookmark: z.string().max(1024).default(''),

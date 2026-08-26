@@ -25,6 +25,12 @@ export interface ReviewAppealCommand {
   privateResolution: Uint8Array;
 }
 
+export interface CredentialDecisionCommand {
+  credentialId: string;
+  reasonHash: string;
+  privateDecision: Uint8Array;
+}
+
 export interface CredentialVerification {
   credentialId: string;
   authentic: boolean;
@@ -43,6 +49,8 @@ export interface CredentialLedger {
     command: CreateCredentialCommand,
   ): Promise<PublicCredentialRecord>;
   approve(credentialId: string): Promise<PublicCredentialRecord>;
+  reject(command: CredentialDecisionCommand): Promise<PublicCredentialRecord>;
+  revoke(command: CredentialDecisionCommand): Promise<PublicCredentialRecord>;
   read(credentialId: string): Promise<PublicCredentialRecord>;
   listIssued(status: PublicCredentialRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
   listForReview(status: PublicCredentialRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;

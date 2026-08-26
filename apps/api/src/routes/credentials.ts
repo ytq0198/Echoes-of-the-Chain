@@ -4,6 +4,7 @@ import {
   createAmendmentRequestSchema,
   createCredentialRequestSchema,
   credentialListQuerySchema,
+  credentialDecisionRequestSchema,
   identifierSchema,
   sha256Schema,
 } from '@chaingrade/shared';
@@ -68,6 +69,26 @@ export async function registerCredentialRoutes(
     options.sessions?.authorize(request, 'reviewer', { csrf: true });
     const { credentialId } = credentialParamsSchema.parse(request.params);
     return reply.send(await options.ledger.approve(credentialId));
+  });
+
+  app.post('/api/v1/credentials/:credentialId/reject', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'reviewer', { csrf: true });
+    const { credentialId } = credentialParamsSchema.parse(request.params);
+    const input = credentialDecisionRequestSchema.parse(request.body);
+    const privateDecision = Buffer.from(canonicalJson(input));
+    const reasonHash = createHash('sha256').update(privateDecision).digest('hex');
+    return reply.send(await options.ledger.reject({ credentialId, reasonHash, privateDecision }));
+  });
+
+  app.post('/api/v1/credentials/:credentialId/revoke', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'reviewer', { csrf: true });
+    const { credentialId } = credentialParamsSchema.parse(request.params);
+    const input = credentialDecisionRequestSchema.parse(request.body);
+    const privateDecision = Buffer.from(canonicalJson(input));
+    const reasonHash = createHash('sha256').update(privateDecision).digest('hex');
+    return reply.send(await options.ledger.revoke({ credentialId, reasonHash, privateDecision }));
   });
 
   app.post('/api/v1/credentials/:credentialId/amendments', async (request, reply) => {

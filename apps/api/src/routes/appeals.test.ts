@@ -31,6 +31,7 @@ function mockLedger(): CredentialLedger {
     createDraft: vi.fn(),
     createAmendment: vi.fn(),
     approve: vi.fn(),
+    reject: vi.fn(), revoke: vi.fn(),
     read: vi.fn(async () => credential),
     listIssued: vi.fn(),
     listForReview: vi.fn(),

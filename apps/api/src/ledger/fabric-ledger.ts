@@ -18,6 +18,7 @@ import type { LedgerPage, PublicAppealRecord, PublicCredentialRecord } from '@ch
 import type { FabricConfig } from './fabric-config.js';
 import type {
   CreateCredentialCommand,
+  CredentialDecisionCommand,
   CreateAppealCommand,
   CredentialLedger,
   CredentialVerification,
@@ -83,6 +84,14 @@ export class FabricCredentialLedger implements CredentialLedger {
     return decodeJson<PublicCredentialRecord>(
       await contract.submitTransaction('ApproveCredential', credentialId),
     );
+  }
+
+  public async reject(command: CredentialDecisionCommand): Promise<PublicCredentialRecord> {
+    return this.submitDecision('RejectCredential', command);
+  }
+
+  public async revoke(command: CredentialDecisionCommand): Promise<PublicCredentialRecord> {
+    return this.submitDecision('RevokeCredential', command);
   }
 
   public async read(credentialId: string): Promise<PublicCredentialRecord> {
@@ -201,6 +210,19 @@ export class FabricCredentialLedger implements CredentialLedger {
     const contract = await this.contractFor(actor);
     return decodeJson<LedgerPage<T>>(
       await contract.evaluateTransaction(transactionName, ...args),
+    );
+  }
+
+  private async submitDecision(
+    transactionName: 'RejectCredential' | 'RevokeCredential',
+    command: CredentialDecisionCommand,
+  ): Promise<PublicCredentialRecord> {
+    const contract = await this.contractFor('reviewer');
+    return decodeJson<PublicCredentialRecord>(
+      await contract.submit(transactionName, {
+        arguments: [command.credentialId, command.reasonHash],
+        transientData: { credentialDecision: command.privateDecision },
+      }),
     );
   }
 

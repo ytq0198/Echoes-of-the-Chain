@@ -167,6 +167,9 @@ export class GradeContract extends Contract {
       );
     }
 
+    const privateDecision = this.requiredTransient(ctx, 'credentialDecision');
+    this.assertPayloadHash(privateDecision, reasonHash, 'credentialDecision');
+
     const previousStatus = record.status;
     record.status = 'REJECTED';
     record.reasonHash = reasonHash;
@@ -174,6 +177,11 @@ export class GradeContract extends Contract {
     record.updatedAt = this.transactionTime(ctx);
     record.transactionId = ctx.stub.getTxID();
     await this.storeCredential(ctx, record, previousStatus);
+    await ctx.stub.putPrivateData(
+      this.privateCollection(ctx),
+      `${this.credentialKey(credentialId)}:decision`,
+      privateDecision,
+    );
     return JSON.stringify(record);
   }
 
@@ -190,6 +198,9 @@ export class GradeContract extends Contract {
       throw new AcademicRecordError('INVALID_STATE', 'only an active credential can be revoked');
     }
 
+    const privateDecision = this.requiredTransient(ctx, 'credentialDecision');
+    this.assertPayloadHash(privateDecision, reasonHash, 'credentialDecision');
+
     const previousStatus = record.status;
     record.status = 'REVOKED';
     record.reasonHash = reasonHash;
@@ -197,6 +208,11 @@ export class GradeContract extends Contract {
     record.updatedAt = this.transactionTime(ctx);
     record.transactionId = ctx.stub.getTxID();
     await this.storeCredential(ctx, record, previousStatus);
+    await ctx.stub.putPrivateData(
+      this.privateCollection(ctx),
+      `${this.credentialKey(credentialId)}:decision`,
+      privateDecision,
+    );
     return JSON.stringify(record);
   }
 

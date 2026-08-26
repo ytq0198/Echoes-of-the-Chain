@@ -19,7 +19,7 @@ const config: SessionConfig = {
 
 function ledger(): CredentialLedger {
   return {
-    createDraft: vi.fn(), createAmendment: vi.fn(), approve: vi.fn(), read: vi.fn(),
+    createDraft: vi.fn(), createAmendment: vi.fn(), approve: vi.fn(), reject: vi.fn(), revoke: vi.fn(), read: vi.fn(),
     listIssued: vi.fn(), listForReview: vi.fn(), listMine: vi.fn(),
     readPrivateDetails: vi.fn(async () => ({ score: 92 })), verify: vi.fn(),
     submitAppeal: vi.fn(), reviewAppeal: vi.fn(), readAppeal: vi.fn(),

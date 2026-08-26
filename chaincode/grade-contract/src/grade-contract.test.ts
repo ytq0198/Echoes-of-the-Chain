@@ -187,12 +187,15 @@ describe('GradeContract', () => {
 
   it('records a rejected draft without exposing the rejection text', async () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:reject1'));
-    const reasonHash = sha256('source document requires correction');
+    const decision = Buffer.from('{"reason":"source document requires correction","salt":"REJECT_SAFE_SALT"}');
+    ledger.transient.set('credentialDecision', decision);
+    const reasonHash = sha256(decision);
     const rejected = JSON.parse(
       await contract.RejectCredential(context(ledger, reviewer), 'cred:2026:reject1', reasonHash),
     ) as CredentialRecord;
     expect(rejected).toMatchObject({ status: 'REJECTED', reasonHash });
     expect(JSON.stringify(rejected)).not.toContain('source document requires correction');
+    expect(ledger.privateState.get('_implicit_org_UniversityAMSP:credential:cred:2026:reject1:decision')).toEqual(decision);
     await expect(
       contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:reject1'),
     ).rejects.toThrow('INVALID_STATE');
@@ -367,10 +370,12 @@ describe('GradeContract', () => {
   it('reports a revoked credential as authentic but invalid', async () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:0005'));
     await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:0005');
+    const decision = Buffer.from('{"reason":"administrative revocation","salt":"REVOKE_SAFE_SALT"}');
+    ledger.transient.set('credentialDecision', decision);
     await contract.RevokeCredential(
       context(ledger, reviewer),
       'cred:2026:0005',
-      sha256('administrative revocation'),
+      sha256(decision),
     );
     const verification = JSON.parse(
       await contract.VerifyCredential(

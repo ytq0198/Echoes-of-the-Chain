@@ -47,6 +47,8 @@ function mockLedger(): CredentialLedger {
       }),
     ),
     approve: vi.fn(async (credentialId) => activeRecord({ credentialId })),
+    reject: vi.fn(async (command) => activeRecord({ credentialId: command.credentialId, status: 'REJECTED', reasonHash: command.reasonHash })),
+    revoke: vi.fn(async (command) => activeRecord({ credentialId: command.credentialId, status: 'REVOKED', reasonHash: command.reasonHash })),
     read: vi.fn(async (credentialId) => activeRecord({ credentialId })),
     listIssued: vi.fn(async (status) => ({ items: [activeRecord({ status })], bookmark: '', fetchedRecordsCount: 1 })),
     listForReview: vi.fn(async (status) => ({ items: [activeRecord({ status })], bookmark: '', fetchedRecordsCount: 1 })),
@@ -117,6 +119,16 @@ describe('credential routes', () => {
     });
     expect(response.statusCode).toBe(200);
     expect(ledger.approve).toHaveBeenCalledWith('cred:2026:api03');
+    await app.close();
+  });
+
+  it('hashes and forwards a private rejection decision', async () => {
+    const ledger = mockLedger();
+    const app = buildApp({ ledger });
+    const response = await app.inject({ method: 'POST', url: '/api/v1/credentials/cred:2026:api03/reject', payload: { reason: '原始成绩材料与草稿不一致。', salt: 'REJECTION_SAFE_SALT_12345' } });
+    expect(response.statusCode).toBe(200);
+    const canonical = '{"reason":"原始成绩材料与草稿不一致。","salt":"REJECTION_SAFE_SALT_12345"}';
+    expect(ledger.reject).toHaveBeenCalledWith(expect.objectContaining({ reasonHash: createHash('sha256').update(canonical).digest('hex'), privateDecision: Buffer.from(canonical) }));
     await app.close();
   });
 
