@@ -69,3 +69,16 @@ export const reviewAppealRequestSchema = z.object({
   decision: z.enum(['ACCEPTED', 'REJECTED']),
   resolution: appealResolutionDetailsSchema,
 });
+
+export const ledgerPageQuerySchema = z.object({
+  pageSize: z.coerce.number().int().min(1).max(50).default(10),
+  bookmark: z.string().max(1024).default(''),
+});
+
+export const credentialListQuerySchema = ledgerPageQuerySchema.extend({
+  status: z.enum(['PENDING_REVIEW', 'ACTIVE', 'REJECTED', 'SUPERSEDED', 'REVOKED']).optional(),
+});
+
+export const appealListQuerySchema = ledgerPageQuerySchema.extend({
+  status: z.enum(['OPEN', 'RESOLVED_ACCEPTED', 'RESOLVED_REJECTED']).optional(),
+});

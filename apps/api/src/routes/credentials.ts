@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import {
   createAmendmentRequestSchema,
   createCredentialRequestSchema,
+  credentialListQuerySchema,
   identifierSchema,
   sha256Schema,
 } from '@chaingrade/shared';
@@ -24,6 +25,27 @@ export async function registerCredentialRoutes(
   app: FastifyInstance,
   options: RouteOptions,
 ): Promise<void> {
+  app.get('/api/v1/credentials/issued', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'issuer');
+    const query = credentialListQuerySchema.parse(request.query);
+    return reply.send(await options.ledger.listIssued(query.status ?? 'PENDING_REVIEW', query.pageSize, query.bookmark));
+  });
+
+  app.get('/api/v1/credentials/review-queue', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'reviewer');
+    const query = credentialListQuerySchema.parse(request.query);
+    return reply.send(await options.ledger.listForReview(query.status ?? 'PENDING_REVIEW', query.pageSize, query.bookmark));
+  });
+
+  app.get('/api/v1/credentials/mine', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'student');
+    const query = credentialListQuerySchema.omit({ status: true }).parse(request.query);
+    return reply.send(await options.ledger.listMine(query.pageSize, query.bookmark));
+  });
+
   app.post('/api/v1/credentials/drafts', async (request, reply) => {
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
     options.sessions?.authorize(request, 'issuer', { csrf: true });

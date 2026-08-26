@@ -48,6 +48,9 @@ function mockLedger(): CredentialLedger {
     ),
     approve: vi.fn(async (credentialId) => activeRecord({ credentialId })),
     read: vi.fn(async (credentialId) => activeRecord({ credentialId })),
+    listIssued: vi.fn(async (status) => ({ items: [activeRecord({ status })], bookmark: '', fetchedRecordsCount: 1 })),
+    listForReview: vi.fn(async (status) => ({ items: [activeRecord({ status })], bookmark: '', fetchedRecordsCount: 1 })),
+    listMine: vi.fn(async () => ({ items: [activeRecord()], bookmark: '', fetchedRecordsCount: 1 })),
     readPrivateDetails: vi.fn(async () => ({ score: 92, grade: 'A' })),
     verify: vi.fn(async (credentialId) => ({
       credentialId,
@@ -62,6 +65,8 @@ function mockLedger(): CredentialLedger {
     submitAppeal: vi.fn(),
     reviewAppeal: vi.fn(),
     readAppeal: vi.fn(),
+    listAppealsForReview: vi.fn(),
+    listMyAppeals: vi.fn(),
     close: vi.fn(),
   };
 }
@@ -145,6 +150,21 @@ describe('credential routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['cache-control']).toBe('no-store');
     expect(response.json()).toMatchObject({ score: 92, grade: 'A' });
+    await app.close();
+  });
+
+  it('validates and forwards review queue pagination to Fabric', async () => {
+    const ledger = mockLedger();
+    const app = buildApp({ ledger });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/credentials/review-queue?status=ACTIVE&pageSize=5&bookmark=cursor-1',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(ledger.listForReview).toHaveBeenCalledWith('ACTIVE', 5, 'cursor-1');
+    expect(response.json().items).toHaveLength(1);
+    const invalid = await app.inject({ method: 'GET', url: '/api/v1/credentials/review-queue?pageSize=100' });
+    expect(invalid.statusCode).toBe(400);
     await app.close();
   });
 });

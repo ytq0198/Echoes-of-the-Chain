@@ -14,6 +14,7 @@ function appealRecord(overrides: Partial<PublicAppealRecord> = {}): PublicAppeal
     appealId: 'appeal:2026:api01',
     credentialId: 'cred:2026:api01',
     subjectHash: hash,
+    issuerMspId: 'Org1MSP',
     reasonHash: hash,
     status: 'OPEN',
     submittedAt: '2026-08-25T00:00:00.000Z',
@@ -31,6 +32,9 @@ function mockLedger(): CredentialLedger {
     createAmendment: vi.fn(),
     approve: vi.fn(),
     read: vi.fn(async () => credential),
+    listIssued: vi.fn(),
+    listForReview: vi.fn(),
+    listMine: vi.fn(),
     readPrivateDetails: vi.fn(),
     verify: vi.fn(),
     submitAppeal: vi.fn(async (command) =>
@@ -44,6 +48,8 @@ function mockLedger(): CredentialLedger {
       }),
     ),
     readAppeal: vi.fn(async (appealId) => appealRecord({ appealId })),
+    listAppealsForReview: vi.fn(async (status) => ({ items: [appealRecord({ status })], bookmark: '', fetchedRecordsCount: 1 })),
+    listMyAppeals: vi.fn(async () => ({ items: [appealRecord()], bookmark: '', fetchedRecordsCount: 1 })),
     close: vi.fn(),
   };
 }
@@ -119,6 +125,19 @@ describe('appeal routes', () => {
     });
     expect(response.statusCode).toBe(409);
     expect(response.json()).toEqual({ code: 'INVALID_STATE', message: '记录当前状态不允许此操作' });
+    await app.close();
+  });
+
+  it('loads the paginated reviewer appeal queue', async () => {
+    const ledger = mockLedger();
+    const app = buildApp({ ledger });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/appeals/review-queue?status=RESOLVED_ACCEPTED&pageSize=8',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(ledger.listAppealsForReview).toHaveBeenCalledWith('RESOLVED_ACCEPTED', 8, '');
+    expect(response.json().items[0].issuerMspId).toBe('Org1MSP');
     await app.close();
   });
 });

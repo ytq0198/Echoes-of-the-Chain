@@ -25,6 +25,23 @@ function sha256(value: Buffer | string): string {
 }
 
 function context(ledger: MockLedger, identity: IdentityOptions): Context {
+  const compositeKey = (objectType: string, attributes: string[]) =>
+    `\u0000${objectType}\u0000${attributes.join('\u0000')}\u0000`;
+  const iterator = (entries: [string, Buffer][]) => {
+    let cursor = 0;
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (const [key, value] of entries) yield { key, value, namespace: '' };
+      },
+      close: async () => undefined,
+      next: async () => {
+        const entry = entries[cursor++];
+        return entry
+          ? { done: false, value: { key: entry[0], value: entry[1], namespace: '' } }
+          : { done: true };
+      },
+    };
+  };
   return {
     clientIdentity: {
       getID: () => identity.id,
@@ -40,6 +57,35 @@ function context(ledger: MockLedger, identity: IdentityOptions): Context {
       putState: async (key: string, value: Uint8Array) => {
         ledger.state.set(key, Buffer.from(value));
       },
+      deleteState: async (key: string) => { ledger.state.delete(key); },
+      createCompositeKey: compositeKey,
+      splitCompositeKey: (key: string) => {
+        const [objectType, ...attributes] = key.split('\u0000').filter(Boolean);
+        return { objectType, attributes };
+      },
+      getStateByPartialCompositeKeyWithPagination: async (
+        objectType: string,
+        attributes: string[],
+        pageSize: number,
+        bookmark = '',
+      ) => {
+        const prefix = compositeKey(objectType, attributes).slice(0, -1);
+        const candidates = [...ledger.state.entries()]
+          .filter(([key]) => key.startsWith(prefix) && key > bookmark)
+          .sort(([left], [right]) => left.localeCompare(right));
+        const page = candidates.slice(0, pageSize);
+        return {
+          iterator: iterator(page),
+          metadata: {
+            fetchedRecordsCount: page.length,
+            bookmark: candidates.length > page.length ? (page.at(-1)?.[0] ?? '') : '',
+          },
+        };
+      },
+      getStateByRange: async (startKey: string, endKey: string) =>
+        iterator([...ledger.state.entries()]
+          .filter(([key]) => key >= startKey && key < endKey)
+          .sort(([left], [right]) => left.localeCompare(right))),
       getTransient: () => ledger.transient,
       putPrivateData: async (collection: string, key: string, value: Uint8Array) => {
         ledger.privateState.set(`${collection}:${key}`, Buffer.from(value));
@@ -332,5 +378,67 @@ describe('GradeContract', () => {
       valid: false,
       status: 'REVOKED',
     });
+  });
+
+  it('provides role-scoped paginated credential queues and moves status indexes', async () => {
+    await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:list01'));
+    await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:list02'));
+
+    const firstPage = JSON.parse(
+      await contract.ListReviewCredentials(context(ledger, reviewer), 'PENDING_REVIEW', '1', ''),
+    ) as { items: CredentialRecord[]; bookmark: string };
+    expect(firstPage.items).toHaveLength(1);
+    expect(firstPage.bookmark).not.toBe('');
+    const secondPage = JSON.parse(
+      await contract.ListReviewCredentials(
+        context(ledger, reviewer), 'PENDING_REVIEW', '1', firstPage.bookmark,
+      ),
+    ) as { items: CredentialRecord[]; bookmark: string };
+    expect(secondPage.items).toHaveLength(1);
+
+    await contract.ApproveCredential(context(ledger, reviewer), firstPage.items[0]!.credentialId);
+    const pending = JSON.parse(
+      await contract.ListReviewCredentials(context(ledger, reviewer), 'PENDING_REVIEW', '10', ''),
+    ) as { items: CredentialRecord[] };
+    const active = JSON.parse(
+      await contract.ListReviewCredentials(context(ledger, reviewer), 'ACTIVE', '10', ''),
+    ) as { items: CredentialRecord[] };
+    expect(pending.items).toHaveLength(1);
+    expect(active.items.map((record) => record.credentialId)).toContain(firstPage.items[0]!.credentialId);
+
+    const student = {
+      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+    } as const;
+    const mine = JSON.parse(
+      await contract.ListMyCredentials(context(ledger, student), '10', ''),
+    ) as { items: CredentialRecord[] };
+    expect(mine.items).toHaveLength(2);
+    await expect(
+      contract.ListMyCredentials(
+        context(ledger, { ...student, subjectHash: sha256('not-alice') }), '10', '',
+      ),
+    ).resolves.toContain('"items":[]');
+  });
+
+  it('indexes appeals for the reviewer queue and the submitting student', async () => {
+    await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:appeal-list'));
+    await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:appeal-list');
+    const student = {
+      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+    } as const;
+    const details = Buffer.from('{"reason":"Please verify the recorded laboratory score.","salt":"APPEAL_LIST_SAFE_SALT"}');
+    ledger.transient.set('appealDetails', details);
+    await contract.SubmitAppeal(
+      context(ledger, student), 'appeal:2026:list01', 'cred:2026:appeal-list', sha256(details),
+    );
+
+    const queue = JSON.parse(
+      await contract.ListReviewAppeals(context(ledger, reviewer), 'OPEN', '10', ''),
+    ) as { items: AppealRecord[] };
+    const mine = JSON.parse(
+      await contract.ListMyAppeals(context(ledger, student), '10', ''),
+    ) as { items: AppealRecord[] };
+    expect(queue.items[0]).toMatchObject({ appealId: 'appeal:2026:list01', issuerMspId: 'UniversityAMSP' });
+    expect(mine.items).toHaveLength(1);
   });
 });

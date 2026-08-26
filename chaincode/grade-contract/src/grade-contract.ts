@@ -4,7 +4,20 @@ import { Context, Contract } from 'fabric-contract-api';
 
 import { AcademicRecordError } from './lib/errors';
 import { assertIdentifier, assertSha256, parseJsonObject } from './lib/validation';
-import type { AppealDecision, AppealRecord, CredentialDraftInput, CredentialRecord } from './model';
+import type {
+  AppealDecision,
+  AppealRecord,
+  AppealStatus,
+  CredentialDraftInput,
+  CredentialRecord,
+  CredentialStatus,
+  LedgerPage,
+} from './model';
+
+const credentialStatuses: CredentialStatus[] = [
+  'PENDING_REVIEW', 'ACTIVE', 'REJECTED', 'SUPERSEDED', 'REVOKED',
+];
+const appealStatuses: AppealStatus[] = ['OPEN', 'RESOLVED_ACCEPTED', 'RESOLVED_REJECTED'];
 
 export class GradeContract extends Contract {
   public constructor() {
@@ -119,17 +132,19 @@ export class GradeContract extends Contract {
           'the previous credential is no longer active',
         );
       }
+      const previousStatus = previous.status;
       previous.status = 'SUPERSEDED';
       previous.updatedAt = now;
       previous.transactionId = ctx.stub.getTxID();
-      await this.storeCredential(ctx, previous);
+      await this.storeCredential(ctx, previous, previousStatus);
     }
 
+    const previousStatus = record.status;
     record.status = 'ACTIVE';
     record.reviewedByIdentityHash = this.identityHash(ctx);
     record.updatedAt = now;
     record.transactionId = ctx.stub.getTxID();
-    await this.storeCredential(ctx, record);
+    await this.storeCredential(ctx, record, previousStatus);
     return JSON.stringify(record);
   }
 
@@ -152,12 +167,13 @@ export class GradeContract extends Contract {
       );
     }
 
+    const previousStatus = record.status;
     record.status = 'REJECTED';
     record.reasonHash = reasonHash;
     record.reviewedByIdentityHash = this.identityHash(ctx);
     record.updatedAt = this.transactionTime(ctx);
     record.transactionId = ctx.stub.getTxID();
-    await this.storeCredential(ctx, record);
+    await this.storeCredential(ctx, record, previousStatus);
     return JSON.stringify(record);
   }
 
@@ -174,17 +190,57 @@ export class GradeContract extends Contract {
       throw new AcademicRecordError('INVALID_STATE', 'only an active credential can be revoked');
     }
 
+    const previousStatus = record.status;
     record.status = 'REVOKED';
     record.reasonHash = reasonHash;
     record.reviewedByIdentityHash = this.identityHash(ctx);
     record.updatedAt = this.transactionTime(ctx);
     record.transactionId = ctx.stub.getTxID();
-    await this.storeCredential(ctx, record);
+    await this.storeCredential(ctx, record, previousStatus);
     return JSON.stringify(record);
   }
 
   public async ReadCredential(ctx: Context, credentialId: string): Promise<string> {
     return JSON.stringify(await this.readCredentialRecord(ctx, credentialId));
+  }
+
+  public async ListIssuedCredentials(
+    ctx: Context,
+    status: string,
+    pageSize: string,
+    bookmark: string,
+  ): Promise<string> {
+    this.assertRole(ctx, 'issuer');
+    return JSON.stringify(await this.listCredentialsByStatus(ctx, status, pageSize, bookmark));
+  }
+
+  public async ListReviewCredentials(
+    ctx: Context,
+    status: string,
+    pageSize: string,
+    bookmark: string,
+  ): Promise<string> {
+    this.assertRole(ctx, 'reviewer');
+    return JSON.stringify(await this.listCredentialsByStatus(ctx, status, pageSize, bookmark));
+  }
+
+  public async ListMyCredentials(
+    ctx: Context,
+    pageSize: string,
+    bookmark: string,
+  ): Promise<string> {
+    this.assertRole(ctx, 'student');
+    const subjectHash = this.requiredSubjectHash(ctx);
+    return JSON.stringify(
+      await this.queryIndex<CredentialRecord>(
+        ctx,
+        'credential~subject',
+        [ctx.clientIdentity.getMSPID(), subjectHash],
+        this.parsePageSize(pageSize),
+        bookmark,
+        (id) => this.credentialKey(id),
+      ),
+    );
   }
 
   public async ReadPrivateCredential(ctx: Context, credentialId: string): Promise<string> {
@@ -254,6 +310,7 @@ export class GradeContract extends Contract {
       appealId,
       credentialId,
       subjectHash: credential.subjectHash,
+      issuerMspId: credential.issuerMspId,
       reasonHash,
       status: 'OPEN',
       submittedAt: now,
@@ -261,7 +318,7 @@ export class GradeContract extends Contract {
       submittedByIdentityHash: this.identityHash(ctx),
       transactionId: ctx.stub.getTxID(),
     };
-    await ctx.stub.putState(this.appealKey(appealId), Buffer.from(JSON.stringify(appeal)));
+    await this.storeAppeal(ctx, appeal);
     await ctx.stub.putPrivateData(
       this.privateCollection(ctx),
       this.appealKey(appealId),
@@ -292,12 +349,13 @@ export class GradeContract extends Contract {
     const privateResolution = this.requiredTransient(ctx, 'appealResolution');
     this.assertPayloadHash(privateResolution, resolutionHash, 'appealResolution');
 
+    const previousStatus = appeal.status;
     appeal.status = decision === 'ACCEPTED' ? 'RESOLVED_ACCEPTED' : 'RESOLVED_REJECTED';
     appeal.resolutionHash = resolutionHash;
     appeal.reviewedByIdentityHash = this.identityHash(ctx);
     appeal.updatedAt = this.transactionTime(ctx);
     appeal.transactionId = ctx.stub.getTxID();
-    await ctx.stub.putState(this.appealKey(appealId), Buffer.from(JSON.stringify(appeal)));
+    await this.storeAppeal(ctx, appeal, previousStatus);
     await ctx.stub.putPrivateData(
       this.privateCollection(ctx),
       `${this.appealKey(appealId)}:resolution`,
@@ -308,6 +366,70 @@ export class GradeContract extends Contract {
 
   public async ReadAppeal(ctx: Context, appealId: string): Promise<string> {
     return JSON.stringify(await this.readAppealRecord(ctx, appealId));
+  }
+
+  public async ListReviewAppeals(
+    ctx: Context,
+    status: string,
+    pageSize: string,
+    bookmark: string,
+  ): Promise<string> {
+    this.assertRole(ctx, 'reviewer');
+    const normalizedStatus = this.parseAppealStatus(status, 'OPEN');
+    return JSON.stringify(
+      await this.queryIndex<AppealRecord>(
+        ctx,
+        'appeal~status',
+        [ctx.clientIdentity.getMSPID(), normalizedStatus],
+        this.parsePageSize(pageSize),
+        bookmark,
+        (id) => this.appealKey(id),
+      ),
+    );
+  }
+
+  public async ListMyAppeals(
+    ctx: Context,
+    pageSize: string,
+    bookmark: string,
+  ): Promise<string> {
+    this.assertRole(ctx, 'student');
+    const subjectHash = this.requiredSubjectHash(ctx);
+    return JSON.stringify(
+      await this.queryIndex<AppealRecord>(
+        ctx,
+        'appeal~subject',
+        [ctx.clientIdentity.getMSPID(), subjectHash],
+        this.parsePageSize(pageSize),
+        bookmark,
+        (id) => this.appealKey(id),
+      ),
+    );
+  }
+
+  public async RebuildIndexes(ctx: Context): Promise<string> {
+    this.assertRole(ctx, 'reviewer');
+    let credentials = 0;
+    let appeals = 0;
+    for await (const entry of ctx.stub.getStateByRange('credential:', 'credential;')) {
+      const record = JSON.parse(Buffer.from(entry.value).toString('utf8')) as CredentialRecord;
+      if (record.docType === 'gradeCredential') {
+        this.assertSameOrganization(ctx, record.issuerMspId);
+        await this.putCredentialIndexes(ctx, record);
+        credentials += 1;
+      }
+    }
+    for await (const entry of ctx.stub.getStateByRange('appeal:', 'appeal;')) {
+      const record = JSON.parse(Buffer.from(entry.value).toString('utf8')) as AppealRecord;
+      if (record.docType === 'gradeAppeal') {
+        const credential = await this.readCredentialRecord(ctx, record.credentialId);
+        this.assertSameOrganization(ctx, credential.issuerMspId);
+        record.issuerMspId = credential.issuerMspId;
+        await this.storeAppeal(ctx, record);
+        appeals += 1;
+      }
+    }
+    return JSON.stringify({ credentials, appeals });
   }
 
   private async readCredentialRecord(
@@ -331,11 +453,148 @@ export class GradeContract extends Contract {
     return JSON.parse(Buffer.from(state).toString('utf8')) as AppealRecord;
   }
 
-  private async storeCredential(ctx: Context, record: CredentialRecord): Promise<void> {
+  private async storeCredential(
+    ctx: Context,
+    record: CredentialRecord,
+    previousStatus?: CredentialStatus,
+  ): Promise<void> {
+    if (previousStatus && previousStatus !== record.status) {
+      await ctx.stub.deleteState(
+        ctx.stub.createCompositeKey('credential~status', [
+          record.issuerMspId, previousStatus, record.credentialId,
+        ]),
+      );
+    }
     await ctx.stub.putState(
       this.credentialKey(record.credentialId),
       Buffer.from(JSON.stringify(record)),
     );
+    await this.putCredentialIndexes(ctx, record);
+  }
+
+  private async putCredentialIndexes(ctx: Context, record: CredentialRecord): Promise<void> {
+    await ctx.stub.putState(
+      ctx.stub.createCompositeKey('credential~status', [
+        record.issuerMspId, record.status, record.credentialId,
+      ]),
+      Buffer.from([0]),
+    );
+    await ctx.stub.putState(
+      ctx.stub.createCompositeKey('credential~subject', [
+        record.issuerMspId, record.subjectHash, record.credentialId,
+      ]),
+      Buffer.from([0]),
+    );
+  }
+
+  private async storeAppeal(
+    ctx: Context,
+    record: AppealRecord,
+    previousStatus?: AppealStatus,
+  ): Promise<void> {
+    if (previousStatus && previousStatus !== record.status) {
+      await ctx.stub.deleteState(
+        ctx.stub.createCompositeKey('appeal~status', [
+          record.issuerMspId, previousStatus, record.appealId,
+        ]),
+      );
+    }
+    await ctx.stub.putState(this.appealKey(record.appealId), Buffer.from(JSON.stringify(record)));
+    await ctx.stub.putState(
+      ctx.stub.createCompositeKey('appeal~status', [
+        record.issuerMspId, record.status, record.appealId,
+      ]),
+      Buffer.from([0]),
+    );
+    await ctx.stub.putState(
+      ctx.stub.createCompositeKey('appeal~subject', [
+        record.issuerMspId, record.subjectHash, record.appealId,
+      ]),
+      Buffer.from([0]),
+    );
+  }
+
+  private async listCredentialsByStatus(
+    ctx: Context,
+    status: string,
+    pageSize: string,
+    bookmark: string,
+  ): Promise<LedgerPage<CredentialRecord>> {
+    const normalizedStatus = this.parseCredentialStatus(status, 'PENDING_REVIEW');
+    return this.queryIndex<CredentialRecord>(
+      ctx,
+      'credential~status',
+      [ctx.clientIdentity.getMSPID(), normalizedStatus],
+      this.parsePageSize(pageSize),
+      bookmark,
+      (id) => this.credentialKey(id),
+    );
+  }
+
+  private async queryIndex<T>(
+    ctx: Context,
+    objectType: string,
+    attributes: string[],
+    pageSize: number,
+    bookmark: string,
+    stateKey: (id: string) => string,
+  ): Promise<LedgerPage<T>> {
+    const response = await ctx.stub.getStateByPartialCompositeKeyWithPagination(
+      objectType,
+      attributes,
+      pageSize,
+      bookmark || undefined,
+    );
+    const items: T[] = [];
+    try {
+      while (true) {
+        const next = await response.iterator.next();
+        if (next.done) break;
+        const parts = ctx.stub.splitCompositeKey(next.value.key);
+        const id = parts.attributes.at(-1);
+        if (!id) continue;
+        const value = await ctx.stub.getState(stateKey(id));
+        if (value.length > 0) items.push(JSON.parse(Buffer.from(value).toString('utf8')) as T);
+      }
+    } finally {
+      await response.iterator.close();
+    }
+    return {
+      items,
+      bookmark: response.metadata.bookmark,
+      fetchedRecordsCount: response.metadata.fetchedRecordsCount,
+    };
+  }
+
+  private parsePageSize(value: string): number {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 50) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'pageSize must be an integer from 1 to 50');
+    }
+    return parsed;
+  }
+
+  private parseCredentialStatus(value: string, fallback: CredentialStatus): CredentialStatus {
+    const normalized = value || fallback;
+    if (!credentialStatuses.includes(normalized as CredentialStatus)) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'unsupported credential status');
+    }
+    return normalized as CredentialStatus;
+  }
+
+  private parseAppealStatus(value: string, fallback: AppealStatus): AppealStatus {
+    const normalized = value || fallback;
+    if (!appealStatuses.includes(normalized as AppealStatus)) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'unsupported appeal status');
+    }
+    return normalized as AppealStatus;
+  }
+
+  private requiredSubjectHash(ctx: Context): string {
+    const subjectHash = ctx.clientIdentity.getAttributeValue('subject.hash');
+    if (!subjectHash) throw new AcademicRecordError('FORBIDDEN', 'subject.hash attribute is required');
+    assertSha256(subjectHash, 'subject.hash');
+    return subjectHash;
   }
 
   private validateDraft(draft: CredentialDraftInput): CredentialDraftInput {

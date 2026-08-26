@@ -13,7 +13,7 @@ import {
   type Signer,
   signers,
 } from '@hyperledger/fabric-gateway';
-import type { PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
+import type { LedgerPage, PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
 
 import type { FabricConfig } from './fabric-config.js';
 import type {
@@ -92,6 +92,22 @@ export class FabricCredentialLedger implements CredentialLedger {
     );
   }
 
+  public async listIssued(
+    status: PublicCredentialRecord['status'], pageSize: number, bookmark: string,
+  ): Promise<LedgerPage<PublicCredentialRecord>> {
+    return this.evaluatePage('issuer', 'ListIssuedCredentials', [status, String(pageSize), bookmark]);
+  }
+
+  public async listForReview(
+    status: PublicCredentialRecord['status'], pageSize: number, bookmark: string,
+  ): Promise<LedgerPage<PublicCredentialRecord>> {
+    return this.evaluatePage('reviewer', 'ListReviewCredentials', [status, String(pageSize), bookmark]);
+  }
+
+  public async listMine(pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>> {
+    return this.evaluatePage('student', 'ListMyCredentials', [String(pageSize), bookmark]);
+  }
+
   public async readPrivateDetails(credentialId: string): Promise<Record<string, unknown>> {
     const contract = await this.contractFor('student');
     return decodeJson<Record<string, unknown>>(
@@ -132,6 +148,16 @@ export class FabricCredentialLedger implements CredentialLedger {
     return decodeJson<PublicAppealRecord>(await contract.evaluateTransaction('ReadAppeal', appealId));
   }
 
+  public async listAppealsForReview(
+    status: PublicAppealRecord['status'], pageSize: number, bookmark: string,
+  ): Promise<LedgerPage<PublicAppealRecord>> {
+    return this.evaluatePage('reviewer', 'ListReviewAppeals', [status, String(pageSize), bookmark]);
+  }
+
+  public async listMyAppeals(pageSize: number, bookmark: string): Promise<LedgerPage<PublicAppealRecord>> {
+    return this.evaluatePage('student', 'ListMyAppeals', [String(pageSize), bookmark]);
+  }
+
   public close(): void {
     for (const connection of this.connections.values()) {
       connection.gateway.close();
@@ -165,6 +191,17 @@ export class FabricCredentialLedger implements CredentialLedger {
       client.close();
       throw error;
     }
+  }
+
+  private async evaluatePage<T>(
+    actor: FabricActor,
+    transactionName: string,
+    args: string[],
+  ): Promise<LedgerPage<T>> {
+    const contract = await this.contractFor(actor);
+    return decodeJson<LedgerPage<T>>(
+      await contract.evaluateTransaction(transactionName, ...args),
+    );
   }
 
   private async newGrpcClient(): Promise<grpc.Client> {

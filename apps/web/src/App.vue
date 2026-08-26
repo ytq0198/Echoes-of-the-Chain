@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import type { PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
+import type {
+  AppealStatus, CredentialStatus, LedgerPage, PublicAppealRecord, PublicCredentialRecord,
+} from '@chaingrade/shared';
 import QrcodeVue from 'qrcode.vue';
 import {
   PhArrowRight, PhBookOpenText, PhCertificate, PhCheckCircle, PhFileText,
   PhGlobe, PhGraduationCap, PhLink, PhList, PhLockKey, PhMagnifyingGlass,
   PhShieldCheck, PhStudent, PhUserCircle, PhUsersThree, PhX,
 } from '@phosphor-icons/vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 type View = 'home' | 'issuer' | 'reviewer' | 'student' | 'verify';
 type RequestState = 'idle' | 'loading' | 'success' | 'error';
@@ -46,6 +48,10 @@ const loginForm = ref({ username: '', password: '' });
 const issuerState = ref<RequestState>('idle');
 const issuerMessage = ref('');
 const issuedRecord = ref<PublicCredentialRecord>();
+const issuedItems = ref<PublicCredentialRecord[]>([]);
+const issuedStatus = ref<CredentialStatus>('PENDING_REVIEW');
+const issuedBookmark = ref('');
+const issuedListState = ref<RequestState>('idle');
 const issuerForm = ref({ credentialId: 'cred:2026:web01', subjectHash: demoSubjectHash, courseHash: demoCourseHash, schemaVersion: '1.0', courseName: '区块链技术与应用', score: 92, grade: 'A', salt: 'CHAIN_GRADE_DEMO_2026' });
 const amendmentState = ref<RequestState>('idle');
 const amendmentMessage = ref('');
@@ -55,14 +61,28 @@ const reviewerCredentialId = ref('cred:2026:web01');
 const reviewerState = ref<RequestState>('idle');
 const reviewerMessage = ref('');
 const reviewRecord = ref<PublicCredentialRecord>();
+const reviewItems = ref<PublicCredentialRecord[]>([]);
+const reviewStatus = ref<CredentialStatus>('PENDING_REVIEW');
+const reviewBookmark = ref('');
+const reviewListState = ref<RequestState>('idle');
 const appealReviewState = ref<RequestState>('idle');
 const appealReviewMessage = ref('');
 const appealReviewRecord = ref<PublicAppealRecord>();
+const appealReviewItems = ref<PublicAppealRecord[]>([]);
+const appealReviewStatus = ref<AppealStatus>('OPEN');
+const appealReviewBookmark = ref('');
+const appealReviewListState = ref<RequestState>('idle');
 const appealReviewForm = ref({ appealId: 'appeal:2026:web01', decision: 'ACCEPTED' as 'ACCEPTED' | 'REJECTED', summary: '核验原始实验记录后，同意进入成绩修订流程。', salt: 'CHAIN_GRADE_RESOLUTION_2026' });
 const studentCredentialId = ref('cred:2026:real01');
 const studentState = ref<RequestState>('idle');
 const studentMessage = ref('');
 const studentRecord = ref<PublicCredentialRecord>();
+const studentItems = ref<PublicCredentialRecord[]>([]);
+const studentBookmark = ref('');
+const studentListState = ref<RequestState>('idle');
+const studentAppealItems = ref<PublicAppealRecord[]>([]);
+const studentAppealBookmark = ref('');
+const studentAppealListState = ref<RequestState>('idle');
 const privateDetailsState = ref<RequestState>('idle');
 const privateDetailsMessage = ref('');
 const privateDetails = ref<Record<string, unknown>>();
@@ -155,11 +175,75 @@ async function logout(): Promise<void> {
   finally { session.value = { authenticated: false }; loginForm.value.username = ''; }
 }
 
+async function loadIssuedList(append = false): Promise<void> {
+  issuedListState.value = 'loading';
+  try {
+    const cursor = append ? issuedBookmark.value : '';
+    const page = await requestJson<LedgerPage<PublicCredentialRecord>>(`/api/v1/credentials/issued?status=${issuedStatus.value}&pageSize=8&bookmark=${encodeURIComponent(cursor)}`);
+    issuedItems.value = append ? [...issuedItems.value, ...page.items] : page.items;
+    issuedBookmark.value = page.bookmark; issuedListState.value = 'success';
+  } catch { issuedListState.value = 'error'; }
+}
+async function loadReviewList(append = false): Promise<void> {
+  reviewListState.value = 'loading';
+  try {
+    const cursor = append ? reviewBookmark.value : '';
+    const page = await requestJson<LedgerPage<PublicCredentialRecord>>(`/api/v1/credentials/review-queue?status=${reviewStatus.value}&pageSize=8&bookmark=${encodeURIComponent(cursor)}`);
+    reviewItems.value = append ? [...reviewItems.value, ...page.items] : page.items;
+    reviewBookmark.value = page.bookmark; reviewListState.value = 'success';
+  } catch { reviewListState.value = 'error'; }
+}
+async function loadAppealReviewList(append = false): Promise<void> {
+  appealReviewListState.value = 'loading';
+  try {
+    const cursor = append ? appealReviewBookmark.value : '';
+    const page = await requestJson<LedgerPage<PublicAppealRecord>>(`/api/v1/appeals/review-queue?status=${appealReviewStatus.value}&pageSize=8&bookmark=${encodeURIComponent(cursor)}`);
+    appealReviewItems.value = append ? [...appealReviewItems.value, ...page.items] : page.items;
+    appealReviewBookmark.value = page.bookmark; appealReviewListState.value = 'success';
+  } catch { appealReviewListState.value = 'error'; }
+}
+async function loadStudentLists(): Promise<void> {
+  studentListState.value = 'loading'; studentAppealListState.value = 'loading';
+  const [credentials, appeals] = await Promise.allSettled([
+    requestJson<LedgerPage<PublicCredentialRecord>>('/api/v1/credentials/mine?pageSize=8'),
+    requestJson<LedgerPage<PublicAppealRecord>>('/api/v1/appeals/mine?pageSize=8'),
+  ]);
+  if (credentials.status === 'fulfilled') {
+    studentItems.value = credentials.value.items; studentBookmark.value = credentials.value.bookmark; studentListState.value = 'success';
+  } else studentListState.value = 'error';
+  if (appeals.status === 'fulfilled') {
+    studentAppealItems.value = appeals.value.items; studentAppealBookmark.value = appeals.value.bookmark; studentAppealListState.value = 'success';
+  } else studentAppealListState.value = 'error';
+}
+async function loadMoreStudentCredentials(): Promise<void> {
+  if (!studentBookmark.value) return;
+  studentListState.value = 'loading';
+  try {
+    const page = await requestJson<LedgerPage<PublicCredentialRecord>>(`/api/v1/credentials/mine?pageSize=8&bookmark=${encodeURIComponent(studentBookmark.value)}`);
+    studentItems.value.push(...page.items); studentBookmark.value = page.bookmark; studentListState.value = 'success';
+  } catch { studentListState.value = 'error'; }
+}
+function selectReviewItem(record: PublicCredentialRecord): void {
+  reviewerCredentialId.value = record.credentialId; reviewRecord.value = record; reviewerMessage.value = '';
+}
+function selectAppealReviewItem(record: PublicAppealRecord): void {
+  appealReviewForm.value.appealId = record.appealId; appealReviewRecord.value = record; appealReviewMessage.value = '';
+}
+function selectStudentItem(record: PublicCredentialRecord): void {
+  studentCredentialId.value = record.credentialId; studentRecord.value = record; privateDetails.value = undefined; sharePanelOpen.value = false;
+}
+function refreshCurrentWorkspace(): void {
+  if (!sessionMatchesView.value) return;
+  if (currentView.value === 'issuer') void loadIssuedList();
+  if (currentView.value === 'reviewer') { void loadReviewList(); void loadAppealReviewList(); }
+  if (currentView.value === 'student') void loadStudentLists();
+}
+
 async function submitCredential(): Promise<void> {
   issuerState.value = 'loading'; issuerMessage.value = ''; issuedRecord.value = undefined;
   try {
     issuedRecord.value = await requestJson<PublicCredentialRecord>('/api/v1/credentials/drafts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credentialId: issuerForm.value.credentialId, subjectHash: issuerForm.value.subjectHash, courseHash: issuerForm.value.courseHash, schemaVersion: issuerForm.value.schemaVersion, details: { salt: issuerForm.value.salt, courseName: issuerForm.value.courseName, score: Number(issuerForm.value.score), grade: issuerForm.value.grade } }) });
-    reviewerCredentialId.value = issuerForm.value.credentialId; issuerState.value = 'success'; issuerMessage.value = '草稿已提交至 Fabric，等待独立复核。';
+    reviewerCredentialId.value = issuerForm.value.credentialId; issuerState.value = 'success'; issuerMessage.value = '草稿已提交至 Fabric，等待独立复核。'; void loadIssuedList();
   } catch (error) { issuerState.value = 'error'; issuerMessage.value = error instanceof Error ? error.message : '提交失败'; }
 }
 async function submitAmendment(): Promise<void> {
@@ -176,7 +260,7 @@ async function loadForReview(): Promise<void> {
 }
 async function approveCredential(): Promise<void> {
   reviewerState.value = 'loading'; reviewerMessage.value = '';
-  try { reviewRecord.value = await requestJson<PublicCredentialRecord>(`/api/v1/credentials/${encodeURIComponent(reviewerCredentialId.value)}/approve`, { method: 'POST' }); reviewerState.value = 'success'; reviewerMessage.value = '复核通过，凭证状态已更新为 ACTIVE。'; }
+  try { reviewRecord.value = await requestJson<PublicCredentialRecord>(`/api/v1/credentials/${encodeURIComponent(reviewerCredentialId.value)}/approve`, { method: 'POST' }); reviewerState.value = 'success'; reviewerMessage.value = '复核通过，凭证状态已更新为 ACTIVE。'; void loadReviewList(); }
   catch (error) { reviewerState.value = 'error'; reviewerMessage.value = error instanceof Error ? error.message : '复核失败'; }
 }
 async function loadAppealForReview(): Promise<void> {
@@ -186,7 +270,7 @@ async function loadAppealForReview(): Promise<void> {
 }
 async function resolveAppeal(): Promise<void> {
   appealReviewState.value = 'loading'; appealReviewMessage.value = '';
-  try { appealReviewRecord.value = await requestJson<PublicAppealRecord>(`/api/v1/appeals/${encodeURIComponent(appealReviewForm.value.appealId)}/review`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: appealReviewForm.value.decision, resolution: { summary: appealReviewForm.value.summary, salt: appealReviewForm.value.salt } }) }); appealReviewState.value = 'success'; appealReviewMessage.value = '申诉结论已写入公共承诺，结论明文已进入组织私有集合。'; }
+  try { appealReviewRecord.value = await requestJson<PublicAppealRecord>(`/api/v1/appeals/${encodeURIComponent(appealReviewForm.value.appealId)}/review`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: appealReviewForm.value.decision, resolution: { summary: appealReviewForm.value.summary, salt: appealReviewForm.value.salt } }) }); appealReviewState.value = 'success'; appealReviewMessage.value = '申诉结论已写入公共承诺，结论明文已进入组织私有集合。'; void loadAppealReviewList(); }
   catch (error) { appealReviewState.value = 'error'; appealReviewMessage.value = error instanceof Error ? error.message : '申诉处理失败'; }
 }
 async function loadStudentCredential(): Promise<void> {
@@ -203,7 +287,7 @@ async function loadPrivateDetails(): Promise<void> {
 async function submitAppeal(): Promise<void> {
   appealState.value = 'loading'; appealMessage.value = ''; submittedAppeal.value = undefined;
   const credentialId = studentRecord.value?.credentialId ?? studentCredentialId.value;
-  try { submittedAppeal.value = await requestJson<PublicAppealRecord>(`/api/v1/credentials/${encodeURIComponent(credentialId)}/appeals`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ appealId: appealForm.value.appealId, details: { reason: appealForm.value.reason, salt: appealForm.value.salt } }) }); appealReviewForm.value.appealId = appealForm.value.appealId; appealState.value = 'success'; appealMessage.value = '申诉已由学生属性证书提交，理由明文未进入公共账本。'; }
+  try { submittedAppeal.value = await requestJson<PublicAppealRecord>(`/api/v1/credentials/${encodeURIComponent(credentialId)}/appeals`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ appealId: appealForm.value.appealId, details: { reason: appealForm.value.reason, salt: appealForm.value.salt } }) }); appealReviewForm.value.appealId = appealForm.value.appealId; appealState.value = 'success'; appealMessage.value = '申诉已由学生属性证书提交，理由明文未进入公共账本。'; void loadStudentLists(); }
   catch (error) { appealState.value = 'error'; appealMessage.value = error instanceof Error ? error.message : '申诉提交失败'; }
 }
 async function verifyCredential(): Promise<void> {
@@ -213,7 +297,8 @@ async function verifyCredential(): Promise<void> {
 }
 function shortHash(value: string): string { return `${value.slice(0, 10)} ··· ${value.slice(-8)}`; }
 function formatTime(value: string): string { return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)); }
-onMounted(() => { hydrateVerificationFromUrl(); currentView.value = viewFromHash(); void loadSession(); window.addEventListener('hashchange', syncHash); });
+watch([currentView, () => session.value.role, () => session.value.authenticated], refreshCurrentWorkspace);
+onMounted(async () => { hydrateVerificationFromUrl(); currentView.value = viewFromHash(); await loadSession(); refreshCurrentWorkspace(); window.addEventListener('hashchange', syncHash); });
 onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
 </script>
 
@@ -284,6 +369,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
       <section v-else-if="currentView === 'issuer'" class="workspace shell">
         <div class="workspace-intro"><span class="role-token">ISSUER</span><h2>创建待复核成绩草稿</h2><p>成绩详情会先规范化并计算 SHA-256，再通过 transient data 进入签发组织的隐式私有集合。</p></div>
         <div class="workspace-content">
+        <section class="ledger-list-panel"><div class="list-toolbar"><div><p class="eyebrow">ISSUED ON LEDGER</p><h3>本组织签发记录</h3></div><label>状态筛选<select v-model="issuedStatus" @change="loadIssuedList()"><option value="PENDING_REVIEW">待复核</option><option value="ACTIVE">有效</option><option value="REJECTED">已驳回</option><option value="SUPERSEDED">已修订</option><option value="REVOKED">已撤销</option></select></label></div><div v-if="issuedItems.length" class="ledger-list"><article v-for="record in issuedItems" :key="record.credentialId"><div><span class="status" :class="record.status.toLowerCase()">{{ record.status }}</span><b>{{ record.credentialId }}</b></div><span>v{{ record.version }} · {{ formatTime(record.updatedAt) }}</span><button type="button" class="text-button" @click="reviewerCredentialId = record.credentialId; openView('reviewer')">交由复核 →</button></article></div><div v-else class="list-empty"><PhFileText :size="26" weight="duotone" /><span>{{ issuedListState === 'loading' ? '正在读取 Fabric 索引…' : '当前筛选下暂无签发记录' }}</span></div><button v-if="issuedBookmark" type="button" class="button secondary list-more" @click="loadIssuedList(true)">载入更多链上记录</button></section>
         <form class="form-panel" @submit.prevent="submitCredential"><div class="field wide"><label for="credential-id">凭证标识</label><input id="credential-id" v-model="issuerForm.credentialId" required /></div><div class="field"><label for="course-name">课程名称</label><input id="course-name" v-model="issuerForm.courseName" required /></div><div class="field"><label for="score">成绩</label><input id="score" v-model.number="issuerForm.score" type="number" min="0" max="100" required /></div><div class="field"><label for="grade">等级</label><select id="grade" v-model="issuerForm.grade"><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select></div><div class="field"><label for="schema-version">Schema 版本</label><input id="schema-version" v-model="issuerForm.schemaVersion" required /></div><div class="field wide"><label for="subject-hash">学生匿名标识（SHA-256）</label><input id="subject-hash" v-model="issuerForm.subjectHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="course-hash">课程标识（SHA-256）</label><input id="course-hash" v-model="issuerForm.courseHash" class="mono" minlength="64" maxlength="64" required /></div><div class="field wide"><label for="salt">隐私盐值</label><input id="salt" v-model="issuerForm.salt" class="mono" minlength="16" required /><small>生产环境必须使用安全随机值，且不得与成绩明文一同公开。</small></div><div class="form-actions"><button class="button primary" :disabled="issuerState === 'loading'">{{ issuerState === 'loading' ? '正在提交…' : '提交至 Fabric' }}</button><span>复核前状态为 PENDING_REVIEW</span></div><p v-if="issuerMessage" class="notice" :class="issuerState">{{ issuerMessage }}</p></form>
         <article v-if="issuedRecord" class="result-card"><div><span class="status pending">{{ issuedRecord.status }}</span><h3>{{ issuedRecord.credentialId }}</h3></div><dl><div><dt>详情承诺</dt><dd class="mono">{{ shortHash(issuedRecord.detailHash) }}</dd></div><div><dt>交易 ID</dt><dd class="mono">{{ shortHash(issuedRecord.transactionId) }}</dd></div></dl><button class="text-button" @click="openView('reviewer')">交给复核员 →</button></article>
         <section class="operation-panel"><div class="operation-heading"><div><p class="eyebrow">IMMUTABLE AMENDMENT</p><h3>创建不可覆盖的修订版本</h3></div><span>旧版本保持可审计</span></div><form class="compact-form" @submit.prevent="submitAmendment"><div class="field"><label for="previous-id">原凭证标识</label><input id="previous-id" v-model="amendmentForm.previousCredentialId" required /></div><div class="field"><label for="amended-id">新版本标识</label><input id="amended-id" v-model="amendmentForm.credentialId" required /></div><div class="field"><label for="amended-score">修订成绩</label><input id="amended-score" v-model.number="amendmentForm.score" type="number" min="0" max="100" required /></div><div class="field"><label for="amended-grade">修订等级</label><select id="amended-grade" v-model="amendmentForm.grade"><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select></div><div class="field wide"><label for="amended-course">课程名称</label><input id="amended-course" v-model="amendmentForm.courseName" required /></div><div class="field wide"><label for="amended-salt">新版本隐私盐值</label><input id="amended-salt" v-model="amendmentForm.salt" class="mono" minlength="16" required /></div><button class="button primary" :disabled="amendmentState === 'loading'">{{ amendmentState === 'loading' ? '正在创建…' : '创建修订草稿' }}</button><p v-if="amendmentMessage" class="notice" :class="amendmentState">{{ amendmentMessage }}</p></form><article v-if="amendedRecord" class="mini-result"><span class="status pending_review">{{ amendedRecord.status }}</span><b>{{ amendedRecord.credentialId }}</b><span>v{{ amendedRecord.version }} · previous {{ amendedRecord.previousCredentialId }}</span><button class="text-button" @click="openView('reviewer')">转交复核 →</button></article></section>
@@ -292,21 +378,23 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
       <section v-else-if="currentView === 'reviewer'" class="workspace shell">
         <div class="workspace-intro"><span class="role-token">REVIEWER</span><h2>独立复核公开承诺</h2><p>复核身份与提交身份使用不同证书。当前工作台只展示公共账本字段，不读取成绩明文。</p></div>
         <div class="workspace-content">
+        <section class="ledger-list-panel review-queue"><div class="list-toolbar"><div><p class="eyebrow">REVIEW QUEUE</p><h3>链上凭证复核队列</h3></div><label>状态筛选<select v-model="reviewStatus" @change="loadReviewList()"><option value="PENDING_REVIEW">待复核</option><option value="ACTIVE">已通过</option><option value="REJECTED">已驳回</option><option value="SUPERSEDED">已修订</option><option value="REVOKED">已撤销</option></select></label></div><div v-if="reviewItems.length" class="ledger-list"><article v-for="record in reviewItems" :key="record.credentialId" :class="{ selected: reviewRecord?.credentialId === record.credentialId }"><div><span class="status" :class="record.status.toLowerCase()">{{ record.status }}</span><b>{{ record.credentialId }}</b></div><span>v{{ record.version }} · {{ formatTime(record.updatedAt) }}</span><button type="button" class="text-button" @click="selectReviewItem(record)">打开复核 →</button></article></div><div v-else class="list-empty"><PhShieldCheck :size="26" weight="duotone" /><span>{{ reviewListState === 'loading' ? '正在读取 Fabric 索引…' : '当前队列已处理完毕' }}</span></div><button v-if="reviewBookmark" type="button" class="button secondary list-more" @click="loadReviewList(true)">载入更多</button></section>
         <div class="lookup-panel"><label for="review-id">凭证标识</label><div class="lookup-row"><input id="review-id" v-model="reviewerCredentialId" /><button class="button secondary" :disabled="reviewerState === 'loading'" @click="loadForReview">查询账本</button></div><p v-if="reviewerMessage" class="notice" :class="reviewerState">{{ reviewerMessage }}</p></div>
         <article v-if="!reviewRecord" class="empty-guidance"><PhShieldCheck :size="34" weight="duotone" /><div><span>WAITING FOR EVIDENCE</span><h3>从公开账本载入待复核承诺</h3><p>复核员将看到签发组织、匿名主体、课程标识与详情哈希；成绩明文不会出现在此处。</p></div><ol><li>输入凭证标识</li><li>核对公共承诺</li><li>批准并激活</li></ol></article>
         <article v-if="reviewRecord" class="review-sheet"><div class="sheet-head"><div><span class="status" :class="reviewRecord.status.toLowerCase()">{{ reviewRecord.status }}</span><h3>{{ reviewRecord.credentialId }}</h3></div><span>v{{ reviewRecord.version }}</span></div><dl class="record-grid"><div><dt>签发组织</dt><dd>{{ reviewRecord.issuerMspId }}</dd></div><div><dt>Schema</dt><dd>{{ reviewRecord.schemaVersion }}</dd></div><div><dt>学生匿名标识</dt><dd class="mono">{{ shortHash(reviewRecord.subjectHash) }}</dd></div><div><dt>课程标识</dt><dd class="mono">{{ shortHash(reviewRecord.courseHash) }}</dd></div><div class="wide"><dt>详情哈希承诺</dt><dd class="mono">{{ reviewRecord.detailHash }}</dd></div><div class="wide"><dt>提交者身份哈希</dt><dd class="mono">{{ reviewRecord.submittedByIdentityHash }}</dd></div></dl><div class="review-actions"><p>批准后写入 reviewer 身份哈希并激活凭证，此操作不可覆盖历史记录。</p><button class="button primary" :disabled="reviewRecord.status !== 'PENDING_REVIEW' || reviewerState === 'loading'" @click="approveCredential">批准并激活</button></div></article>
-        <section class="operation-panel appeal-review-panel"><div class="operation-heading"><div><p class="eyebrow">APPEAL REVIEW</p><h3>申诉复核与结论承诺</h3></div><span>理由与结论均不公开</span></div><div class="lookup-row"><input v-model="appealReviewForm.appealId" aria-label="申诉标识" /><button class="button secondary" :disabled="appealReviewState === 'loading'" @click="loadAppealForReview">查询申诉</button></div><p v-if="appealReviewMessage" class="notice" :class="appealReviewState">{{ appealReviewMessage }}</p><article v-if="appealReviewRecord" class="appeal-summary"><div><span class="status" :class="appealReviewRecord.status.toLowerCase()">{{ appealReviewRecord.status }}</span><b>{{ appealReviewRecord.appealId }}</b></div><p>关联凭证：{{ appealReviewRecord.credentialId }}</p><p class="mono">reason {{ shortHash(appealReviewRecord.reasonHash) }}</p><form v-if="appealReviewRecord.status === 'OPEN'" class="compact-form" @submit.prevent="resolveAppeal"><div class="field"><label for="appeal-decision">处理结论</label><select id="appeal-decision" v-model="appealReviewForm.decision"><option value="ACCEPTED">接受申诉</option><option value="REJECTED">驳回申诉</option></select></div><div class="field"><label for="resolution-salt">结论隐私盐值</label><input id="resolution-salt" v-model="appealReviewForm.salt" minlength="16" required /></div><div class="field wide"><label for="resolution-summary">结论说明</label><textarea id="resolution-summary" v-model="appealReviewForm.summary" minlength="10" required></textarea></div><button class="button primary" :disabled="appealReviewState === 'loading'">提交复核结论</button></form></article></section>
+        <section class="operation-panel appeal-review-panel"><div class="operation-heading"><div><p class="eyebrow">APPEAL REVIEW</p><h3>申诉复核与结论承诺</h3></div><span>理由与结论均不公开</span></div><div class="list-toolbar inline-filter"><p>链上申诉队列</p><label>状态<select v-model="appealReviewStatus" @change="loadAppealReviewList()"><option value="OPEN">待处理</option><option value="RESOLVED_ACCEPTED">已接受</option><option value="RESOLVED_REJECTED">已驳回</option></select></label></div><div v-if="appealReviewItems.length" class="ledger-list compact"><article v-for="appeal in appealReviewItems" :key="appeal.appealId" :class="{ selected: appealReviewRecord?.appealId === appeal.appealId }"><div><span class="status" :class="appeal.status.toLowerCase()">{{ appeal.status }}</span><b>{{ appeal.appealId }}</b></div><span>关联 {{ appeal.credentialId }}</span><button type="button" class="text-button" @click="selectAppealReviewItem(appeal)">处理 →</button></article></div><div v-else class="list-empty small"><span>{{ appealReviewListState === 'loading' ? '正在加载申诉索引…' : '当前没有此状态的申诉' }}</span></div><button v-if="appealReviewBookmark" type="button" class="button secondary list-more" @click="loadAppealReviewList(true)">载入更多</button><div class="lookup-row"><input v-model="appealReviewForm.appealId" aria-label="申诉标识" /><button class="button secondary" :disabled="appealReviewState === 'loading'" @click="loadAppealForReview">按标识查询</button></div><p v-if="appealReviewMessage" class="notice" :class="appealReviewState">{{ appealReviewMessage }}</p><article v-if="appealReviewRecord" class="appeal-summary"><div><span class="status" :class="appealReviewRecord.status.toLowerCase()">{{ appealReviewRecord.status }}</span><b>{{ appealReviewRecord.appealId }}</b></div><p>关联凭证：{{ appealReviewRecord.credentialId }}</p><p class="mono">reason {{ shortHash(appealReviewRecord.reasonHash) }}</p><form v-if="appealReviewRecord.status === 'OPEN'" class="compact-form" @submit.prevent="resolveAppeal"><div class="field"><label for="appeal-decision">处理结论</label><select id="appeal-decision" v-model="appealReviewForm.decision"><option value="ACCEPTED">接受申诉</option><option value="REJECTED">驳回申诉</option></select></div><div class="field"><label for="resolution-salt">结论隐私盐值</label><input id="resolution-salt" v-model="appealReviewForm.salt" minlength="16" required /></div><div class="field wide"><label for="resolution-summary">结论说明</label><textarea id="resolution-summary" v-model="appealReviewForm.summary" minlength="10" required></textarea></div><button class="button primary" :disabled="appealReviewState === 'loading'">提交复核结论</button></form></article></section>
         </div>
       </section>
       <section v-else-if="currentView === 'student'" class="workspace shell">
         <div class="workspace-intro"><span class="role-token">STUDENT</span><h2>查看凭证并提交本人申诉</h2><p>学生端围绕“持有、理解、申诉、授权披露”设计。申诉由带有 subject.hash 属性的学生证书提交，理由只进入签发组织私有集合。</p></div>
         <div class="workspace-content">
+        <section class="ledger-list-panel student-vault"><div class="list-toolbar"><div><p class="eyebrow">MY CREDENTIALS</p><h3>由学生证书解锁的凭证</h3></div><span class="subject-bound"><PhLockKey :size="16" weight="fill" /> SUBJECT BOUND</span></div><div v-if="studentItems.length" class="ledger-list credential-grid"><article v-for="record in studentItems" :key="record.credentialId" :class="{ selected: studentRecord?.credentialId === record.credentialId }"><div><span class="status" :class="record.status.toLowerCase()">{{ record.status }}</span><b>{{ record.credentialId }}</b></div><span>版本 v{{ record.version }} · {{ formatTime(record.updatedAt) }}</span><button type="button" class="text-button" @click="selectStudentItem(record)">打开凭证 →</button></article></div><div v-else class="list-empty"><PhCertificate :size="27" weight="duotone" /><span>{{ studentListState === 'loading' ? '正在校验证书属性并读取索引…' : '当前学生身份下暂无凭证' }}</span></div><button v-if="studentBookmark" type="button" class="button secondary list-more" @click="loadMoreStudentCredentials">载入更多本人凭证</button></section>
         <div class="lookup-panel"><label for="student-id">凭证标识</label><div class="lookup-row"><input id="student-id" v-model="studentCredentialId" /><button class="button secondary" :disabled="studentState === 'loading'" @click="loadStudentCredential">打开凭证</button></div><p v-if="studentMessage" class="notice" :class="studentState">{{ studentMessage }}</p></div>
         <article v-if="!studentRecord" class="empty-guidance student-guidance"><PhStudent :size="34" weight="duotone" /><div><span>YOUR CREDENTIAL SPACE</span><h3>凭证在这里成为学生可理解的证据</h3><p>打开凭证后可查看有效状态、请求本人私有成绩，或针对当前有效版本发起轻量申诉。</p></div><ol><li>打开本人凭证</li><li>按需披露成绩</li><li>提交私有申诉</li></ol></article>
         <article v-if="studentRecord" class="student-card"><div class="credential-seal">CG</div><div class="student-card-main"><p>ACADEMIC CREDENTIAL · v{{ studentRecord.version }}</p><h3>{{ studentRecord.credentialId }}</h3><span class="status" :class="studentRecord.status.toLowerCase()">{{ studentRecord.status }}</span><dl><div><dt>签发组织</dt><dd>{{ studentRecord.issuerMspId }}</dd></div><div><dt>最近更新</dt><dd>{{ formatTime(studentRecord.updatedAt) }}</dd></div><div><dt>成绩详情</dt><dd>{{ privateDetails ? '本人授权已读取' : '仅授权后披露' }}</dd></div></dl><div class="student-actions"><button class="button secondary" :disabled="studentRecord.status !== 'ACTIVE'" @click="scrollToAppeal">发起成绩申诉</button><button class="button secondary" :disabled="privateDetailsState === 'loading'" @click="loadPrivateDetails">{{ privateDetailsState === 'loading' ? '正在验证证书…' : '授权读取成绩' }}</button><button class="button primary" @click="openSharePanel">生成验真入口</button></div></div></article>
         <article v-if="sharePanelOpen && studentRecord" class="share-card"><div class="qr-frame"><QrcodeVue :value="verificationShareUrl" :size="184" level="M" render-as="svg" /></div><div class="share-copy"><p class="eyebrow">SHAREABLE VERIFICATION</p><h3>让核验者扫码查看链上结论</h3><p>二维码只携带凭证标识与详情哈希，不包含成绩、盐值或学生身份信息。持有者可自主决定是否分享。</p><div class="share-url mono">{{ verificationShareUrl }}</div><div class="share-actions"><button class="button secondary" type="button" @click="copyShareLink">{{ shareCopyMessage || '复制验真链接' }}</button><button class="button primary" type="button" @click="openSharedVerification">预览验真结果</button></div></div></article>
         <article v-if="privateDetails || privateDetailsMessage" class="private-details-card"><div class="operation-heading"><div><p class="eyebrow">SUBJECT-BOUND DISCLOSURE</p><h3>仅向本人披露的成绩详情</h3></div><span>Cache-Control: no-store</span></div><p v-if="privateDetailsMessage" class="notice" :class="privateDetailsState">{{ privateDetailsMessage }}</p><dl v-if="privateDetails"><div v-for="(value, key) in privateDetails" :key="key"><dt>{{ key }}</dt><dd :class="{ mono: key === 'salt' }">{{ key === 'salt' ? '••••••••（不展示）' : value }}</dd></div></dl></article>
-        <section id="appeal-form" class="operation-panel"><div class="operation-heading"><div><p class="eyebrow">PRIVATE APPEAL</p><h3>提交轻量成绩申诉</h3></div><span>学生属性证书约束本人凭证</span></div><form class="compact-form" @submit.prevent="submitAppeal"><div class="field"><label for="appeal-id">申诉标识</label><input id="appeal-id" v-model="appealForm.appealId" required /></div><div class="field"><label>关联凭证</label><input :value="studentRecord?.credentialId ?? studentCredentialId" disabled /></div><div class="field wide"><label for="appeal-reason">申诉理由</label><textarea id="appeal-reason" v-model="appealForm.reason" minlength="10" maxlength="2000" required></textarea></div><div class="field wide"><label for="appeal-salt">申诉隐私盐值</label><input id="appeal-salt" v-model="appealForm.salt" class="mono" minlength="16" required /></div><button class="button primary" :disabled="appealState === 'loading' || studentRecord?.status !== 'ACTIVE'">{{ appealState === 'loading' ? '正在提交…' : '由学生证书提交申诉' }}</button><p v-if="appealMessage" class="notice" :class="appealState">{{ appealMessage }}</p></form><article v-if="submittedAppeal" class="mini-result"><span class="status open">{{ submittedAppeal.status }}</span><b>{{ submittedAppeal.appealId }}</b><span class="mono">reason {{ shortHash(submittedAppeal.reasonHash) }}</span></article></section>
+        <section id="appeal-form" class="operation-panel"><div class="operation-heading"><div><p class="eyebrow">PRIVATE APPEAL</p><h3>提交轻量成绩申诉</h3></div><span>学生属性证书约束本人凭证</span></div><div v-if="studentAppealItems.length" class="my-appeals"><p>我的申诉进度</p><article v-for="appeal in studentAppealItems" :key="appeal.appealId"><span class="status" :class="appeal.status.toLowerCase()">{{ appeal.status }}</span><b>{{ appeal.appealId }}</b><span>{{ appeal.credentialId }}</span><time>{{ formatTime(appeal.updatedAt) }}</time></article></div><div v-else-if="studentAppealListState !== 'loading'" class="list-empty small"><span>尚未提交成绩申诉</span></div><form class="compact-form" @submit.prevent="submitAppeal"><div class="field"><label for="appeal-id">申诉标识</label><input id="appeal-id" v-model="appealForm.appealId" required /></div><div class="field"><label>关联凭证</label><input :value="studentRecord?.credentialId ?? studentCredentialId" disabled /></div><div class="field wide"><label for="appeal-reason">申诉理由</label><textarea id="appeal-reason" v-model="appealForm.reason" minlength="10" maxlength="2000" required></textarea></div><div class="field wide"><label for="appeal-salt">申诉隐私盐值</label><input id="appeal-salt" v-model="appealForm.salt" class="mono" minlength="16" required /></div><button class="button primary" :disabled="appealState === 'loading' || studentRecord?.status !== 'ACTIVE'">{{ appealState === 'loading' ? '正在提交…' : '由学生证书提交申诉' }}</button><p v-if="appealMessage" class="notice" :class="appealState">{{ appealMessage }}</p></form><article v-if="submittedAppeal" class="mini-result"><span class="status open">{{ submittedAppeal.status }}</span><b>{{ submittedAppeal.appealId }}</b><span class="mono">reason {{ shortHash(submittedAppeal.reasonHash) }}</span></article></section>
         </div>
       </section>
       <section v-else class="workspace verify-workspace shell">
@@ -319,6 +407,6 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
       </section>
       <aside class="principle-strip"><div class="shell"><PhLockKey :size="20" weight="duotone" /><p><b>最小披露原则</b><span>公共账本只承载验证所需的状态、承诺与审计字段，成绩与申诉正文始终留在授权边界内。</span></p><a href="#home">查看证据链全貌<PhArrowRight :size="16" /></a></div></aside>
     </template>
-    <footer class="footer"><div class="brand"><span class="brand-mark"><PhShieldCheck :size="17" weight="fill" /></span><span>ChainGrade</span></div><p>Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.4 <span>·</span> 区块高度 23</p><a href="#home">返回工作台</a></footer>
+    <footer class="footer"><div class="brand"><span class="brand-mark"><PhShieldCheck :size="17" weight="fill" /></span><span>ChainGrade</span></div><p>Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.5 <span>·</span> 可分页链上索引</p><a href="#home">返回工作台</a></footer>
   </main>
 </template>

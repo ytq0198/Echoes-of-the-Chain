@@ -12,6 +12,12 @@ export const appealStatuses = ['OPEN', 'RESOLVED_ACCEPTED', 'RESOLVED_REJECTED']
 
 export type AppealStatus = (typeof appealStatuses)[number];
 
+export interface LedgerPage<T> {
+  items: T[];
+  bookmark: string;
+  fetchedRecordsCount: number;
+}
+
 export interface PublicCredentialRecord {
   docType: 'gradeCredential';
   credentialId: string;
@@ -36,6 +42,7 @@ export interface PublicAppealRecord {
   appealId: string;
   credentialId: string;
   subjectHash: string;
+  issuerMspId: string;
   reasonHash: string;
   status: AppealStatus;
   submittedAt: string;

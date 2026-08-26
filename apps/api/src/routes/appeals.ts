@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import {
   createAppealRequestSchema,
+  appealListQuerySchema,
   identifierSchema,
   reviewAppealRequestSchema,
 } from '@chaingrade/shared';
@@ -24,6 +25,20 @@ export async function registerAppealRoutes(
   app: FastifyInstance,
   options: RouteOptions,
 ): Promise<void> {
+  app.get('/api/v1/appeals/review-queue', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'reviewer');
+    const query = appealListQuerySchema.parse(request.query);
+    return reply.send(await options.ledger.listAppealsForReview(query.status ?? 'OPEN', query.pageSize, query.bookmark));
+  });
+
+  app.get('/api/v1/appeals/mine', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'student');
+    const query = appealListQuerySchema.omit({ status: true }).parse(request.query);
+    return reply.send(await options.ledger.listMyAppeals(query.pageSize, query.bookmark));
+  });
+
   app.post('/api/v1/credentials/:credentialId/appeals', async (request, reply) => {
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
     options.sessions?.authorize(request, 'student', { csrf: true });

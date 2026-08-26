@@ -1,4 +1,4 @@
-import type { PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
+import type { LedgerPage, PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
 
 export type FabricActor = 'issuer' | 'reviewer' | 'student';
 
@@ -44,10 +44,15 @@ export interface CredentialLedger {
   ): Promise<PublicCredentialRecord>;
   approve(credentialId: string): Promise<PublicCredentialRecord>;
   read(credentialId: string): Promise<PublicCredentialRecord>;
+  listIssued(status: PublicCredentialRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
+  listForReview(status: PublicCredentialRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
+  listMine(pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
   readPrivateDetails(credentialId: string): Promise<Record<string, unknown>>;
   verify(credentialId: string, expectedDetailHash?: string): Promise<CredentialVerification>;
   submitAppeal(command: CreateAppealCommand): Promise<PublicAppealRecord>;
   reviewAppeal(command: ReviewAppealCommand): Promise<PublicAppealRecord>;
   readAppeal(appealId: string): Promise<PublicAppealRecord>;
+  listAppealsForReview(status: PublicAppealRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicAppealRecord>>;
+  listMyAppeals(pageSize: number, bookmark: string): Promise<LedgerPage<PublicAppealRecord>>;
   close(): void;
 }

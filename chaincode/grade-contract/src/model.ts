@@ -31,6 +31,7 @@ export interface AppealRecord {
   appealId: string;
   credentialId: string;
   subjectHash: string;
+  issuerMspId: string;
   reasonHash: string;
   status: AppealStatus;
   submittedAt: string;
@@ -39,4 +40,10 @@ export interface AppealRecord {
   reviewedByIdentityHash?: string;
   resolutionHash?: string;
   transactionId: string;
+}
+
+export interface LedgerPage<T> {
+  items: T[];
+  bookmark: string;
+  fetchedRecordsCount: number;
 }
