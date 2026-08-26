@@ -539,30 +539,43 @@ export class GradeContract extends Contract {
     bookmark: string,
     stateKey: (id: string) => string,
   ): Promise<LedgerPage<T>> {
-    const response = await ctx.stub.getStateByPartialCompositeKeyWithPagination(
-      objectType,
-      attributes,
-      pageSize,
-      bookmark || undefined,
-    );
+    let cursor = '';
+    if (bookmark) {
+      try {
+        cursor = Buffer.from(bookmark, 'base64url').toString('utf8');
+      } catch {
+        throw new AcademicRecordError('INVALID_ARGUMENT', 'bookmark is invalid');
+      }
+    }
+    const iterator = await ctx.stub.getStateByPartialCompositeKey(objectType, attributes);
     const items: T[] = [];
+    let lastKey = '';
+    let hasMore = false;
     try {
       while (true) {
-        const next = await response.iterator.next();
+        const next = await iterator.next();
         if (next.done) break;
+        if (cursor && next.value.key <= cursor) continue;
+        if (items.length >= pageSize) {
+          hasMore = true;
+          break;
+        }
         const parts = ctx.stub.splitCompositeKey(next.value.key);
         const id = parts.attributes.at(-1);
         if (!id) continue;
         const value = await ctx.stub.getState(stateKey(id));
-        if (value.length > 0) items.push(JSON.parse(Buffer.from(value).toString('utf8')) as T);
+        if (value.length > 0) {
+          items.push(JSON.parse(Buffer.from(value).toString('utf8')) as T);
+          lastKey = next.value.key;
+        }
       }
     } finally {
-      await response.iterator.close();
+      await iterator.close();
     }
     return {
       items,
-      bookmark: response.metadata.bookmark,
-      fetchedRecordsCount: response.metadata.fetchedRecordsCount,
+      bookmark: hasMore && lastKey ? Buffer.from(lastKey).toString('base64url') : '',
+      fetchedRecordsCount: items.length,
     };
   }
 

@@ -30,9 +30,11 @@ Fabric 的交易原子性保证记录与索引不会只更新一半。`RebuildIn
 ## 分页协议
 
 - `pageSize` 限制为 1–50，当前界面默认每次读取 8 条；
-- `bookmark` 是 Fabric 返回的不可解释游标，API 只负责校验长度并原样透传；
+- `bookmark` 是链码根据最后一个 Fabric 复合键生成的 Base64URL 不透明游标，API 只负责校验长度并原样透传；
 - 返回统一为 `{ items, bookmark, fetchedRecordsCount }`；
 - 空字符串表示没有下一页，界面据此隐藏“载入更多”。
+
+没有直接依赖 Node shim 的分页 metadata：真实 LevelDB 验收发现 Fabric 2.5.8 shim 在该调用路径未返回 metadata。链码改为遍历同一复合键前缀、跳过游标之前的键并多读一条判断是否存在下一页，因此在 LevelDB 与 CouchDB 上行为一致。
 
 ## 隐私与越权控制
 

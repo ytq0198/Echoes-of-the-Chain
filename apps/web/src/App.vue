@@ -407,6 +407,6 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
       </section>
       <aside class="principle-strip"><div class="shell"><PhLockKey :size="20" weight="duotone" /><p><b>最小披露原则</b><span>公共账本只承载验证所需的状态、承诺与审计字段，成绩与申诉正文始终留在授权边界内。</span></p><a href="#home">查看证据链全貌<PhArrowRight :size="16" /></a></div></aside>
     </template>
-    <footer class="footer"><div class="brand"><span class="brand-mark"><PhShieldCheck :size="17" weight="fill" /></span><span>ChainGrade</span></div><p>Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.5 <span>·</span> 可分页链上索引</p><a href="#home">返回工作台</a></footer>
+    <footer class="footer"><div class="brand"><span class="brand-mark"><PhShieldCheck :size="17" weight="fill" /></span><span>ChainGrade</span></div><p>Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.6 <span>·</span> 可分页链上索引</p><a href="#home">返回工作台</a></footer>
   </main>
 </template>

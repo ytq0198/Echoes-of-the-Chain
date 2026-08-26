@@ -82,6 +82,12 @@ function context(ledger: MockLedger, identity: IdentityOptions): Context {
           },
         };
       },
+      getStateByPartialCompositeKey: async (objectType: string, attributes: string[]) => {
+        const prefix = compositeKey(objectType, attributes).slice(0, -1);
+        return iterator([...ledger.state.entries()]
+          .filter(([key]) => key.startsWith(prefix))
+          .sort(([left], [right]) => left.localeCompare(right)));
+      },
       getStateByRange: async (startKey: string, endKey: string) =>
         iterator([...ledger.state.entries()]
           .filter(([key]) => key >= startKey && key < endKey)
