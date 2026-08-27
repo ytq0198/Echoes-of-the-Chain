@@ -53,6 +53,13 @@ package_chaincode() {
     -C "${PACKAGE_ROOT}/outer" -czf "${PACKAGE_FILE}" metadata.json code.tar.gz
 }
 
+prepare_package_id() {
+  package_chaincode
+  PACKAGE_ID="$("${BIN_ROOT}/peer" lifecycle chaincode calculatepackageid "${PACKAGE_FILE}")"
+  export PACKAGE_ID
+  echo "Package ID: ${PACKAGE_ID}"
+}
+
 install_for_org() {
   local org="$1"
   local msp="$2"
@@ -136,19 +143,60 @@ query_definition() {
     --channelID "${CHANNEL_NAME}" --name "${CHAINCODE_NAME}"
 }
 
+definition_is_committed() {
+  local output
+  configure_org 1 Org1MSP 7051
+  output="$("${BIN_ROOT}/peer" lifecycle chaincode querycommitted \
+    --channelID "${CHANNEL_NAME}" --name "${CHAINCODE_NAME}" 2>/dev/null)" || return 1
+  grep -Fq "Version: ${CHAINCODE_VERSION}, Sequence: ${CHAINCODE_SEQUENCE}" <<<"${output}"
+}
+
+package_is_installed_for_org() {
+  local org="$1"
+  local msp="$2"
+  local port="$3"
+  configure_org "${org}" "${msp}" "${port}"
+  "${BIN_ROOT}/peer" lifecycle chaincode queryinstalled 2>/dev/null | grep -Fq "${PACKAGE_ID}"
+}
+
+require_installed_package() {
+  local missing=0
+  package_is_installed_for_org 1 Org1MSP 7051 || {
+    echo "Current package ID is not installed on peer0.org1" >&2
+    missing=1
+  }
+  package_is_installed_for_org 2 Org2MSP 9051 || {
+    echo "Current package ID is not installed on peer0.org2" >&2
+    missing=1
+  }
+  [[ "${missing}" -eq 0 ]]
+}
+
 case "${1:-deploy}" in
   deploy)
     "${SCRIPT_DIR}/native-network.sh" status >/dev/null
-    package_chaincode
-    PACKAGE_ID="$("${BIN_ROOT}/peer" lifecycle chaincode calculatepackageid "${PACKAGE_FILE}")"
-    export PACKAGE_ID
-    echo "Package ID: ${PACKAGE_ID}"
+    prepare_package_id
     install_for_org 1 Org1MSP 7051
     install_for_org 2 Org2MSP 9051
     start_server
-    approve_for_org 1 Org1MSP 7051
-    approve_for_org 2 Org2MSP 9051
-    commit_definition
+    if definition_is_committed; then
+      echo "Expected chaincode definition is already committed; skipping lifecycle commit"
+    else
+      approve_for_org 1 Org1MSP 7051
+      approve_for_org 2 Org2MSP 9051
+      commit_definition
+    fi
+    query_definition
+    ;;
+  start)
+    "${SCRIPT_DIR}/native-network.sh" status >/dev/null
+    prepare_package_id
+    require_installed_package
+    definition_is_committed || {
+      echo "Expected chaincode definition is not committed; run '$0 deploy' first" >&2
+      exit 1
+    }
+    start_server
     query_definition
     ;;
   status)
@@ -164,5 +212,5 @@ case "${1:-deploy}" in
     fi
     rm -f -- "${pid_file}"
     ;;
-  *) echo "Usage: $0 {deploy|status|stop}" >&2; exit 2 ;;
+  *) echo "Usage: $0 {deploy|start|status|stop}" >&2; exit 2 ;;
 esac
