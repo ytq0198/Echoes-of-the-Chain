@@ -12,6 +12,10 @@ export interface CredentialDraftInput {
   schemaVersion: string;
 }
 
+export interface CredentialBatchInput {
+  drafts: CredentialDraftInput[];
+}
+
 export interface CredentialRecord extends CredentialDraftInput {
   docType: 'gradeCredential';
   issuerMspId: string;

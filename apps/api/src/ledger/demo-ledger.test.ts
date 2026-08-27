@@ -7,6 +7,34 @@ import { DemoCredentialLedger } from './demo-ledger.js';
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 
 describe('DemoCredentialLedger', () => {
+  it('keeps offline batch imports atomic and on one synthetic transaction', async () => {
+    const ledger = new DemoCredentialLedger();
+    const command = (credentialId: string) => ({
+      credentialId,
+      subjectHash: 'a'.repeat(64),
+      courseHash: 'b'.repeat(64),
+      detailHash: 'c'.repeat(64),
+      schemaVersion: '1.0',
+      privateDetails: Buffer.from(
+        '{"courseName":"区块链技术与应用","grade":"A","salt":"BATCH_DEMO_SALT_0001","score":92}',
+      ),
+    });
+    const records = await ledger.createBatchDrafts([
+      command('cred:2026:demo-batch01'),
+      command('cred:2026:demo-batch02'),
+    ]);
+    expect(records).toHaveLength(2);
+    expect(new Set(records.map((record) => record.transactionId)).size).toBe(1);
+
+    await expect(
+      ledger.createBatchDrafts([
+        command('cred:2026:demo-batch03'),
+        command('cred:2026:demo-batch01'),
+      ]),
+    ).rejects.toThrow('ALREADY_EXISTS');
+    await expect(ledger.read('cred:2026:demo-batch03')).rejects.toThrow('NOT_FOUND');
+  });
+
   it('supports bounded disclosure without returning unselected grade fields', async () => {
     const ledger = new DemoCredentialLedger();
     const access = { token: 'demo-token', purpose: '奖学金材料核验', verifier: '奖学金评审办公室' };

@@ -66,6 +66,7 @@ export interface CredentialVerification {
 
 export interface CredentialLedger {
   createDraft(command: CreateCredentialCommand): Promise<PublicCredentialRecord>;
+  createBatchDrafts(commands: CreateCredentialCommand[]): Promise<PublicCredentialRecord[]>;
   createAmendment(
     previousCredentialId: string,
     command: CreateCredentialCommand,
@@ -74,20 +75,34 @@ export interface CredentialLedger {
   reject(command: CredentialDecisionCommand): Promise<PublicCredentialRecord>;
   revoke(command: CredentialDecisionCommand): Promise<PublicCredentialRecord>;
   read(credentialId: string): Promise<PublicCredentialRecord>;
-  listIssued(status: PublicCredentialRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
-  listForReview(status: PublicCredentialRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
+  listIssued(
+    status: PublicCredentialRecord['status'],
+    pageSize: number,
+    bookmark: string,
+  ): Promise<LedgerPage<PublicCredentialRecord>>;
+  listForReview(
+    status: PublicCredentialRecord['status'],
+    pageSize: number,
+    bookmark: string,
+  ): Promise<LedgerPage<PublicCredentialRecord>>;
   listMine(pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
   readPrivateDetails(credentialId: string): Promise<Record<string, unknown>>;
   verify(credentialId: string, expectedDetailHash?: string): Promise<CredentialVerification>;
   createDisclosure(command: CreateDisclosureCommand): Promise<PublicDisclosureGrant>;
-  evaluateDisclosure(command: ConsumeDisclosureCommand): Promise<Partial<Record<DisclosureField, unknown>>>;
+  evaluateDisclosure(
+    command: ConsumeDisclosureCommand,
+  ): Promise<Partial<Record<DisclosureField, unknown>>>;
   consumeDisclosure(command: ConsumeDisclosureCommand): Promise<PublicDisclosureGrant>;
   revokeDisclosure(grantId: string): Promise<PublicDisclosureGrant>;
   listMyDisclosures(pageSize: number, bookmark: string): Promise<LedgerPage<PublicDisclosureGrant>>;
   submitAppeal(command: CreateAppealCommand): Promise<PublicAppealRecord>;
   reviewAppeal(command: ReviewAppealCommand): Promise<PublicAppealRecord>;
   readAppeal(appealId: string): Promise<PublicAppealRecord>;
-  listAppealsForReview(status: PublicAppealRecord['status'], pageSize: number, bookmark: string): Promise<LedgerPage<PublicAppealRecord>>;
+  listAppealsForReview(
+    status: PublicAppealRecord['status'],
+    pageSize: number,
+    bookmark: string,
+  ): Promise<LedgerPage<PublicAppealRecord>>;
   listMyAppeals(pageSize: number, bookmark: string): Promise<LedgerPage<PublicAppealRecord>>;
   close(): void;
 }

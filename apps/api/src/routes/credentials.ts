@@ -7,6 +7,7 @@ import {
   consumeDisclosureRequestSchema,
   credentialListQuerySchema,
   credentialDecisionRequestSchema,
+  gradeBatchImportRequestSchema,
   identifierSchema,
   sha256Schema,
 } from '@chaingrade/shared';
@@ -33,14 +34,26 @@ export async function registerCredentialRoutes(
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
     options.sessions?.authorize(request, 'issuer');
     const query = credentialListQuerySchema.parse(request.query);
-    return reply.send(await options.ledger.listIssued(query.status ?? 'PENDING_REVIEW', query.pageSize, query.bookmark));
+    return reply.send(
+      await options.ledger.listIssued(
+        query.status ?? 'PENDING_REVIEW',
+        query.pageSize,
+        query.bookmark,
+      ),
+    );
   });
 
   app.get('/api/v1/credentials/review-queue', async (request, reply) => {
     if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
     options.sessions?.authorize(request, 'reviewer');
     const query = credentialListQuerySchema.parse(request.query);
-    return reply.send(await options.ledger.listForReview(query.status ?? 'PENDING_REVIEW', query.pageSize, query.bookmark));
+    return reply.send(
+      await options.ledger.listForReview(
+        query.status ?? 'PENDING_REVIEW',
+        query.pageSize,
+        query.bookmark,
+      ),
+    );
   });
 
   app.get('/api/v1/credentials/mine', async (request, reply) => {
@@ -65,6 +78,30 @@ export async function registerCredentialRoutes(
       privateDetails,
     });
     return reply.code(201).send(record);
+  });
+
+  app.post('/api/v1/credentials/imports', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'issuer', { csrf: true });
+    const input = gradeBatchImportRequestSchema.parse(request.body);
+    const commands = input.rows.map((row) => {
+      const privateDetails = Buffer.from(canonicalJson(row.details));
+      return {
+        credentialId: row.credentialId,
+        subjectHash: row.subjectHash,
+        courseHash: row.courseHash,
+        schemaVersion: row.schemaVersion,
+        detailHash: createHash('sha256').update(privateDetails).digest('hex'),
+        privateDetails,
+      };
+    });
+    const items = await options.ledger.createBatchDrafts(commands);
+    reply.header('cache-control', 'no-store');
+    return reply.code(201).send({
+      items,
+      importedCount: items.length,
+      transactionId: items[0]?.transactionId ?? '',
+    });
   });
 
   app.post('/api/v1/credentials/:credentialId/approve', async (request, reply) => {

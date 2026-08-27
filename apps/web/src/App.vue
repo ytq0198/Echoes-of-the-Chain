@@ -8,7 +8,9 @@ import type {
   PublicAppealRecord,
   PublicCredentialRecord,
   PublicDisclosureGrant,
+  GradeCsvRow,
 } from '@chaingrade/shared';
+import { gradeCsvHeader, parseGradeCsv, validateGradeCsvRows } from '@chaingrade/shared';
 import QrcodeVue from 'qrcode.vue';
 import {
   PhArrowRight,
@@ -55,6 +57,12 @@ interface VerificationResult {
   issuerMspId: string;
   version: number;
   updatedAt: string;
+  transactionId: string;
+}
+
+interface BatchImportResult {
+  items: PublicCredentialRecord[];
+  importedCount: number;
   transactionId: string;
 }
 
@@ -105,6 +113,11 @@ const issuerForm = ref({
   grade: 'A',
   salt: 'CHAIN_GRADE_DEMO_2026',
 });
+const batchCsv = ref('');
+const batchRows = ref<GradeCsvRow[]>([]);
+const batchState = ref<RequestState>('idle');
+const batchMessage = ref('');
+const batchResult = ref<BatchImportResult>();
 const amendmentState = ref<RequestState>('idle');
 const amendmentMessage = ref('');
 const amendedRecord = ref<PublicCredentialRecord>();
@@ -546,6 +559,51 @@ async function submitCredential(): Promise<void> {
     issuerMessage.value = error instanceof Error ? error.message : '提交失败';
   }
 }
+
+function parseBatchCsv(): void {
+  batchState.value = 'loading';
+  batchMessage.value = '';
+  batchResult.value = undefined;
+  try {
+    const rows = parseGradeCsv(batchCsv.value);
+    const errors = validateGradeCsvRows(rows);
+    if (errors.length) throw new Error(errors[0]);
+    batchRows.value = rows;
+    batchState.value = 'success';
+    batchMessage.value = `已通过本地预检，共 ${rows.length} 条；提交后将由一笔原子交易创建。`;
+  } catch (error) {
+    batchRows.value = [];
+    batchState.value = 'error';
+    batchMessage.value = error instanceof Error ? error.message : 'CSV 解析失败';
+  }
+}
+
+async function submitBatchImport(): Promise<void> {
+  if (!batchRows.value.length) return;
+  batchState.value = 'loading';
+  batchMessage.value = '';
+  batchResult.value = undefined;
+  try {
+    const rows = batchRows.value.map((row) => ({
+      credentialId: row.credentialId,
+      subjectHash: row.subjectHash,
+      courseHash: row.courseHash,
+      schemaVersion: row.schemaVersion,
+      details: { courseName: row.courseName, score: row.score, grade: row.grade, salt: row.salt },
+    }));
+    batchResult.value = await requestJson<BatchImportResult>('/api/v1/credentials/imports', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    });
+    batchState.value = 'success';
+    batchMessage.value = `已原子创建 ${batchResult.value.importedCount} 条待复核草稿。`;
+    void loadIssuedList();
+  } catch (error) {
+    batchState.value = 'error';
+    batchMessage.value = error instanceof Error ? error.message : '批量导入失败';
+  }
+}
 async function submitAmendment(): Promise<void> {
   amendmentState.value = 'loading';
   amendmentMessage.value = '';
@@ -904,7 +962,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
             </div>
             <div>
               <dt>链码</dt>
-              <dd class="mono">grade 0.8</dd>
+              <dd class="mono">grade 0.9</dd>
             </div>
             <div>
               <dt>授权模型</dt>
@@ -1251,6 +1309,106 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
             </dl>
             <button class="text-button" @click="openView('reviewer')">交给复核员 →</button>
           </article>
+          <section class="operation-panel batch-import-panel">
+            <div class="operation-heading">
+              <div>
+                <p class="eyebrow">ATOMIC CSV IMPORT</p>
+                <h3>批量导入成绩草稿</h3>
+              </div>
+              <span>单笔交易 · 最多 50 条</span>
+            </div>
+            <p class="operation-description">
+              CSV 先在浏览器内完成格式与字段预检；提交时，成绩详情经 transient data
+              进入隐式私有集合，任一记录失败则整批不写入。
+            </p>
+            <div class="field wide">
+              <label for="batch-csv">UTF-8 CSV 内容</label>
+              <textarea
+                id="batch-csv"
+                v-model="batchCsv"
+                class="batch-csv-input mono"
+                :placeholder="`${gradeCsvHeader}\ncred:2026:...,64位学生哈希,64位课程哈希,课程名称,92,A,1.0,至少16位随机盐值`"
+                spellcheck="false"
+                @input="
+                  batchRows = [];
+                  batchResult = undefined;
+                  batchState = 'idle';
+                  batchMessage = '';
+                "
+              ></textarea>
+              <small>原始 CSV 不会被保存；公共账本不包含课程名、成绩或盐值。</small>
+            </div>
+            <div class="batch-actions">
+              <button class="button secondary" type="button" @click="parseBatchCsv">
+                本地解析并预检
+              </button>
+              <button
+                class="button primary"
+                type="button"
+                :disabled="!batchRows.length || batchState === 'loading'"
+                @click="submitBatchImport"
+              >
+                {{
+                  batchState === 'loading' ? '正在提交…' : `原子提交 ${batchRows.length || 0} 条`
+                }}
+              </button>
+            </div>
+            <p v-if="batchMessage" class="notice" :class="batchState">{{ batchMessage }}</p>
+            <div
+              v-if="batchRows.length"
+              class="batch-preview"
+              role="region"
+              aria-label="CSV 成绩预览"
+            >
+              <div class="batch-preview-heading">
+                <div>
+                  <p class="eyebrow">LOCAL PREVIEW</p>
+                  <h4>提交前预览</h4>
+                </div>
+                <span>{{ batchRows.length }} 条已校验</span>
+              </div>
+              <div class="batch-preview-table" role="table" aria-label="批量成绩草稿">
+                <div class="batch-preview-row header" role="row">
+                  <span>凭证标识</span><span>课程</span><span>分数</span><span>等级</span>
+                </div>
+                <div
+                  v-for="row in batchRows.slice(0, 8)"
+                  :key="row.credentialId"
+                  class="batch-preview-row"
+                  role="row"
+                >
+                  <span class="mono">{{ row.credentialId }}</span
+                  ><span>{{ row.courseName }}</span
+                  ><span>{{ row.score }}</span
+                  ><span
+                    ><b>{{ row.grade }}</b></span
+                  >
+                </div>
+              </div>
+              <p v-if="batchRows.length > 8" class="batch-overflow-note">
+                另有 {{ batchRows.length - 8 }} 条将在同一批次提交。
+              </p>
+            </div>
+            <article v-if="batchResult" class="batch-result">
+              <div>
+                <span class="status pending_review">PENDING_REVIEW</span>
+                <h4>{{ batchResult.importedCount }} 条草稿已创建</h4>
+              </div>
+              <dl>
+                <div>
+                  <dt>原子交易 ID</dt>
+                  <dd class="mono">{{ shortHash(batchResult.transactionId) }}</dd>
+                </div>
+                <div>
+                  <dt>下一步</dt>
+                  <dd>进入独立复核队列</dd>
+                </div>
+              </dl>
+              <button class="text-button" type="button" @click="openView('reviewer')">
+                转交复核 →
+              </button>
+            </article>
+          </section>
           <section class="operation-panel">
             <div class="operation-heading">
               <div>
@@ -2173,7 +2331,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
         ><span>ChainGrade</span>
       </div>
       <p>
-        Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.8
+        Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.9
         <span>·</span> 限时最小披露
       </p>
       <a href="#home">返回工作台</a>

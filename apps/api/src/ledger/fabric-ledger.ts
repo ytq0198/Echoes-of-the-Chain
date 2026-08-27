@@ -14,7 +14,10 @@ import {
   signers,
 } from '@hyperledger/fabric-gateway';
 import type {
-  LedgerPage, PublicAppealRecord, PublicCredentialRecord, PublicDisclosureGrant,
+  LedgerPage,
+  PublicAppealRecord,
+  PublicCredentialRecord,
+  PublicDisclosureGrant,
 } from '@chaingrade/shared';
 
 import type { FabricConfig } from './fabric-config.js';
@@ -62,6 +65,25 @@ export class FabricCredentialLedger implements CredentialLedger {
     return decodeJson<PublicCredentialRecord>(result);
   }
 
+  public async createBatchDrafts(
+    commands: CreateCredentialCommand[],
+  ): Promise<PublicCredentialRecord[]> {
+    const contract = await this.contractFor('issuer');
+    const privateBatch = Object.fromEntries(
+      commands.map((command) => [
+        command.credentialId,
+        Buffer.from(command.privateDetails).toString('base64'),
+      ]),
+    );
+    const result = await contract.submit('CreateCredentialBatch', {
+      arguments: [
+        JSON.stringify({ drafts: commands.map(({ privateDetails: _, ...draft }) => draft) }),
+      ],
+      transientData: { gradeBatch: Buffer.from(JSON.stringify(privateBatch)) },
+    });
+    return decodeJson<PublicCredentialRecord[]>(result);
+  }
+
   public async createAmendment(
     previousCredentialId: string,
     command: CreateCredentialCommand,
@@ -106,18 +128,33 @@ export class FabricCredentialLedger implements CredentialLedger {
   }
 
   public async listIssued(
-    status: PublicCredentialRecord['status'], pageSize: number, bookmark: string,
+    status: PublicCredentialRecord['status'],
+    pageSize: number,
+    bookmark: string,
   ): Promise<LedgerPage<PublicCredentialRecord>> {
-    return this.evaluatePage('issuer', 'ListIssuedCredentials', [status, String(pageSize), bookmark]);
+    return this.evaluatePage('issuer', 'ListIssuedCredentials', [
+      status,
+      String(pageSize),
+      bookmark,
+    ]);
   }
 
   public async listForReview(
-    status: PublicCredentialRecord['status'], pageSize: number, bookmark: string,
+    status: PublicCredentialRecord['status'],
+    pageSize: number,
+    bookmark: string,
   ): Promise<LedgerPage<PublicCredentialRecord>> {
-    return this.evaluatePage('reviewer', 'ListReviewCredentials', [status, String(pageSize), bookmark]);
+    return this.evaluatePage('reviewer', 'ListReviewCredentials', [
+      status,
+      String(pageSize),
+      bookmark,
+    ]);
   }
 
-  public async listMine(pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>> {
+  public async listMine(
+    pageSize: number,
+    bookmark: string,
+  ): Promise<LedgerPage<PublicCredentialRecord>> {
     return this.evaluatePage('student', 'ListMyCredentials', [String(pageSize), bookmark]);
   }
 
@@ -140,28 +177,33 @@ export class FabricCredentialLedger implements CredentialLedger {
 
   public async createDisclosure(command: CreateDisclosureCommand): Promise<PublicDisclosureGrant> {
     const contract = await this.contractFor('student');
-    return decodeJson<PublicDisclosureGrant>(await contract.submitTransaction(
-      'CreateDisclosureGrant',
-      JSON.stringify(command),
-    ));
+    return decodeJson<PublicDisclosureGrant>(
+      await contract.submitTransaction('CreateDisclosureGrant', JSON.stringify(command)),
+    );
   }
 
   public async evaluateDisclosure(
     command: ConsumeDisclosureCommand,
   ): Promise<Record<string, unknown>> {
     const contract = await this.contractFor('reviewer');
-    return decodeJson<Record<string, unknown>>(await contract.evaluate('EvaluateDisclosureGrant', {
-      arguments: [command.grantId],
-      transientData: { disclosureAccess: command.privateAccess },
-    }));
+    return decodeJson<Record<string, unknown>>(
+      await contract.evaluate('EvaluateDisclosureGrant', {
+        arguments: [command.grantId],
+        transientData: { disclosureAccess: command.privateAccess },
+      }),
+    );
   }
 
-  public async consumeDisclosure(command: ConsumeDisclosureCommand): Promise<PublicDisclosureGrant> {
+  public async consumeDisclosure(
+    command: ConsumeDisclosureCommand,
+  ): Promise<PublicDisclosureGrant> {
     const contract = await this.contractFor('reviewer');
-    return decodeJson<PublicDisclosureGrant>(await contract.submit('ConsumeDisclosureGrant', {
-      arguments: [command.grantId],
-      transientData: { disclosureAccess: command.privateAccess },
-    }));
+    return decodeJson<PublicDisclosureGrant>(
+      await contract.submit('ConsumeDisclosureGrant', {
+        arguments: [command.grantId],
+        transientData: { disclosureAccess: command.privateAccess },
+      }),
+    );
   }
 
   public async revokeDisclosure(grantId: string): Promise<PublicDisclosureGrant> {
@@ -198,16 +240,23 @@ export class FabricCredentialLedger implements CredentialLedger {
 
   public async readAppeal(appealId: string): Promise<PublicAppealRecord> {
     const contract = await this.contractFor('reviewer');
-    return decodeJson<PublicAppealRecord>(await contract.evaluateTransaction('ReadAppeal', appealId));
+    return decodeJson<PublicAppealRecord>(
+      await contract.evaluateTransaction('ReadAppeal', appealId),
+    );
   }
 
   public async listAppealsForReview(
-    status: PublicAppealRecord['status'], pageSize: number, bookmark: string,
+    status: PublicAppealRecord['status'],
+    pageSize: number,
+    bookmark: string,
   ): Promise<LedgerPage<PublicAppealRecord>> {
     return this.evaluatePage('reviewer', 'ListReviewAppeals', [status, String(pageSize), bookmark]);
   }
 
-  public async listMyAppeals(pageSize: number, bookmark: string): Promise<LedgerPage<PublicAppealRecord>> {
+  public async listMyAppeals(
+    pageSize: number,
+    bookmark: string,
+  ): Promise<LedgerPage<PublicAppealRecord>> {
     return this.evaluatePage('student', 'ListMyAppeals', [String(pageSize), bookmark]);
   }
 
@@ -252,9 +301,7 @@ export class FabricCredentialLedger implements CredentialLedger {
     args: string[],
   ): Promise<LedgerPage<T>> {
     const contract = await this.contractFor(actor);
-    return decodeJson<LedgerPage<T>>(
-      await contract.evaluateTransaction(transactionName, ...args),
-    );
+    return decodeJson<LedgerPage<T>>(await contract.evaluateTransaction(transactionName, ...args));
   }
 
   private async submitDecision(

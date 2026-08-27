@@ -629,3 +629,145 @@ body { background: var(--paper); }
   .empty-guidance { min-height: 250px; grid-template-columns: 1fr; padding: 26px 24px; }
   .empty-guidance ol { grid-column: 1; align-items: flex-start; flex-direction: column; }
 }
+
+/* Iteration 9: atomic grade batch import */
+.operation-description {
+  margin: -5px 0 24px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.batch-csv-input {
+  min-height: 220px;
+  resize: vertical;
+  font-size: 11px;
+  line-height: 1.75;
+  white-space: pre;
+}
+.batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.batch-preview {
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.batch-preview-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+.batch-preview-heading h4 {
+  margin: 4px 0 0;
+  font-size: 19px;
+}
+.batch-preview-heading > span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 750;
+}
+.batch-preview-table {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.batch-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) 60px 60px;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.batch-preview-row:last-child {
+  border-bottom: 0;
+}
+.batch-preview-row > span {
+  min-width: 0;
+  padding: 11px 13px;
+  overflow-wrap: anywhere;
+}
+.batch-preview-row.header {
+  min-height: 38px;
+  color: var(--muted);
+  background: #f4f5f0;
+  font-size: 10px;
+  font-weight: 750;
+}
+.batch-preview-row:not(.header) > span:nth-child(3),
+.batch-preview-row:not(.header) > span:nth-child(4) {
+  font-size: 14px;
+}
+.batch-overflow-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.batch-result {
+  margin-top: 24px;
+  padding: 22px;
+  border: 1px solid #b9cbb8;
+  border-radius: 12px;
+  background: #edf6eb;
+}
+.batch-result > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.batch-result h4 {
+  margin: 0;
+  font-size: 18px;
+}
+.batch-result dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+.batch-result dl div {
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid #c7d7c7;
+}
+.batch-result dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+.batch-result dd {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 700;
+}
+@media (max-width: 700px) {
+  .batch-csv-input {
+    min-height: 260px;
+    font-size: 10px;
+  }
+  .batch-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .batch-actions .button {
+    width: 100%;
+  }
+  .batch-preview-row {
+    grid-template-columns: minmax(0, 1.5fr) 52px 46px;
+  }
+  .batch-preview-row > span:nth-child(2) {
+    display: none;
+  }
+  .batch-preview-row > span {
+    padding-inline: 9px;
+    font-size: 10px;
+  }
+  .batch-result dl {
+    grid-template-columns: 1fr;
+  }
+}

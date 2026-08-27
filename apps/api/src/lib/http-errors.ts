@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 
 const statusByCode: Record<string, number> = {
   INVALID_ARGUMENT: 400,
+  INVALID_JSON: 400,
   MISSING_PRIVATE_DATA: 400,
   HASH_MISMATCH: 400,
   FORBIDDEN: 403,
@@ -23,7 +24,10 @@ export function registerHttpErrorHandler(app: FastifyInstance): void {
       return reply.code(400).send({
         code: 'VALIDATION_ERROR',
         message: '请求字段不符合约束',
-        issues: error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+        issues: error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+        })),
       });
     }
 
@@ -56,13 +60,16 @@ function errorMessages(error: unknown): string[] {
 }
 
 function extractDomainCode(message: string): string | undefined {
-  return Object.keys(statusByCode).find((code) => new RegExp(`(?:^|\\b)${code}(?::|\\b)`).test(message));
+  return Object.keys(statusByCode).find((code) =>
+    new RegExp(`(?:^|\\b)${code}(?::|\\b)`).test(message),
+  );
 }
 
 function domainMessage(code: string): string {
   return (
     {
       INVALID_ARGUMENT: '请求参数无效',
+      INVALID_JSON: '请求数据不是有效的 JSON 对象',
       MISSING_PRIVATE_DATA: '缺少隐私数据',
       HASH_MISMATCH: '隐私数据与公共哈希不一致',
       FORBIDDEN: '当前身份无权执行此操作',

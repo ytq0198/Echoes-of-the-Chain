@@ -57,7 +57,9 @@ function context(ledger: MockLedger, identity: IdentityOptions): Context {
       putState: async (key: string, value: Uint8Array) => {
         ledger.state.set(key, Buffer.from(value));
       },
-      deleteState: async (key: string) => { ledger.state.delete(key); },
+      deleteState: async (key: string) => {
+        ledger.state.delete(key);
+      },
       createCompositeKey: compositeKey,
       splitCompositeKey: (key: string) => {
         const [objectType, ...attributes] = key.split('\u0000').filter(Boolean);
@@ -84,14 +86,18 @@ function context(ledger: MockLedger, identity: IdentityOptions): Context {
       },
       getStateByPartialCompositeKey: async (objectType: string, attributes: string[]) => {
         const prefix = compositeKey(objectType, attributes).slice(0, -1);
-        return iterator([...ledger.state.entries()]
-          .filter(([key]) => key.startsWith(prefix))
-          .sort(([left], [right]) => left.localeCompare(right)));
+        return iterator(
+          [...ledger.state.entries()]
+            .filter(([key]) => key.startsWith(prefix))
+            .sort(([left], [right]) => left.localeCompare(right)),
+        );
       },
       getStateByRange: async (startKey: string, endKey: string) =>
-        iterator([...ledger.state.entries()]
-          .filter(([key]) => key >= startKey && key < endKey)
-          .sort(([left], [right]) => left.localeCompare(right))),
+        iterator(
+          [...ledger.state.entries()]
+            .filter(([key]) => key >= startKey && key < endKey)
+            .sort(([left], [right]) => left.localeCompare(right)),
+        ),
       getTransient: () => ledger.transient,
       putPrivateData: async (collection: string, key: string, value: Uint8Array) => {
         ledger.privateState.set(`${collection}:${key}`, Buffer.from(value));
@@ -150,6 +156,75 @@ describe('GradeContract', () => {
     expect(approved.reviewedByIdentityHash).not.toBe(approved.submittedByIdentityHash);
   });
 
+  it('creates multiple private drafts in one atomic batch transaction', async () => {
+    const secondDetails = Buffer.from(
+      JSON.stringify({ score: 88, grade: 'B+', salt: 'SECOND_BATCH_SALT' }),
+    );
+    const drafts = [
+      JSON.parse(draft('cred:2026:batch01')),
+      { ...JSON.parse(draft('cred:2026:batch02')), detailHash: sha256(secondDetails) },
+    ];
+    ledger.transient.set(
+      'gradeBatch',
+      Buffer.from(
+        JSON.stringify({
+          'cred:2026:batch01': gradeDetails.toString('base64'),
+          'cred:2026:batch02': secondDetails.toString('base64'),
+        }),
+      ),
+    );
+
+    const records = JSON.parse(
+      await contract.CreateCredentialBatch(context(ledger, issuer), JSON.stringify({ drafts })),
+    ) as CredentialRecord[];
+    expect(records).toHaveLength(2);
+    expect(new Set(records.map((record) => record.transactionId))).toEqual(new Set(['tx-0001']));
+    expect(records.every((record) => record.status === 'PENDING_REVIEW')).toBe(true);
+    expect(
+      ledger.privateState.get('_implicit_org_UniversityAMSP:credential:cred:2026:batch02'),
+    ).toEqual(secondDetails);
+    expect(JSON.stringify(records)).not.toContain('SECOND_BATCH_SALT');
+  });
+
+  it('prevalidates the full batch before writing any record', async () => {
+    const first = JSON.parse(draft('cred:2026:atomic01'));
+    const second = { ...JSON.parse(draft('cred:2026:atomic02')), detailHash: sha256('wrong') };
+    ledger.transient.set(
+      'gradeBatch',
+      Buffer.from(
+        JSON.stringify({
+          'cred:2026:atomic01': gradeDetails.toString('base64'),
+          'cred:2026:atomic02': gradeDetails.toString('base64'),
+        }),
+      ),
+    );
+
+    await expect(
+      contract.CreateCredentialBatch(
+        context(ledger, issuer),
+        JSON.stringify({ drafts: [first, second] }),
+      ),
+    ).rejects.toThrow('HASH_MISMATCH');
+    expect(ledger.state.has('credential:cred:2026:atomic01')).toBe(false);
+    expect(ledger.privateState.size).toBe(0);
+
+    ledger.transient.set(
+      'gradeBatch',
+      Buffer.from(
+        JSON.stringify({
+          'cred:2026:atomic01': gradeDetails.toString('base64'),
+        }),
+      ),
+    );
+    await expect(
+      contract.CreateCredentialBatch(
+        context(ledger, issuer),
+        JSON.stringify({ drafts: [first, first] }),
+      ),
+    ).rejects.toThrow('unique within a batch');
+    expect(ledger.state.has('credential:cred:2026:atomic01')).toBe(false);
+  });
+
   it('rejects self-approval even when the certificate has reviewer role', async () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:0002'));
     const sameCertificateWithReviewerRole = { ...issuer, role: 'reviewer' as const };
@@ -187,7 +262,9 @@ describe('GradeContract', () => {
 
   it('records a rejected draft without exposing the rejection text', async () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:reject1'));
-    const decision = Buffer.from('{"reason":"source document requires correction","salt":"REJECT_SAFE_SALT"}');
+    const decision = Buffer.from(
+      '{"reason":"source document requires correction","salt":"REJECT_SAFE_SALT"}',
+    );
     ledger.transient.set('credentialDecision', decision);
     const reasonHash = sha256(decision);
     const rejected = JSON.parse(
@@ -195,7 +272,9 @@ describe('GradeContract', () => {
     ) as CredentialRecord;
     expect(rejected).toMatchObject({ status: 'REJECTED', reasonHash });
     expect(JSON.stringify(rejected)).not.toContain('source document requires correction');
-    expect(ledger.privateState.get('_implicit_org_UniversityAMSP:credential:cred:2026:reject1:decision')).toEqual(decision);
+    expect(
+      ledger.privateState.get('_implicit_org_UniversityAMSP:credential:cred:2026:reject1:decision'),
+    ).toEqual(decision);
     await expect(
       contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:reject1'),
     ).rejects.toThrow('INVALID_STATE');
@@ -321,16 +400,19 @@ describe('GradeContract', () => {
     ) as AppealRecord;
     expect(resolved.status).toBe('RESOLVED_ACCEPTED');
     expect(
-      ledger.privateState.get(
-        '_implicit_org_UniversityAMSP:appeal:appeal:2026:0001:resolution',
-      ),
+      ledger.privateState.get('_implicit_org_UniversityAMSP:appeal:appeal:2026:0001:resolution'),
     ).toEqual(resolutionDetails);
   });
 
   it('allows only the credential subject to read private grade details', async () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:private-read'));
     await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:private-read');
-    const student = { id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash } as const;
+    const student = {
+      id: 'x509::student-alice',
+      mspId: 'UniversityAMSP',
+      role: 'student',
+      subjectHash,
+    } as const;
     expect(
       await contract.ReadPrivateCredential(context(ledger, student), 'cred:2026:private-read'),
     ).toBe(gradeDetails.toString('utf8'));
@@ -370,13 +452,11 @@ describe('GradeContract', () => {
   it('reports a revoked credential as authentic but invalid', async () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:0005'));
     await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:0005');
-    const decision = Buffer.from('{"reason":"administrative revocation","salt":"REVOKE_SAFE_SALT"}');
-    ledger.transient.set('credentialDecision', decision);
-    await contract.RevokeCredential(
-      context(ledger, reviewer),
-      'cred:2026:0005',
-      sha256(decision),
+    const decision = Buffer.from(
+      '{"reason":"administrative revocation","salt":"REVOKE_SAFE_SALT"}',
     );
+    ledger.transient.set('credentialDecision', decision);
+    await contract.RevokeCredential(context(ledger, reviewer), 'cred:2026:0005', sha256(decision));
     const verification = JSON.parse(
       await contract.VerifyCredential(
         context(ledger, reviewer),
@@ -402,7 +482,10 @@ describe('GradeContract', () => {
     expect(firstPage.bookmark).not.toBe('');
     const secondPage = JSON.parse(
       await contract.ListReviewCredentials(
-        context(ledger, reviewer), 'PENDING_REVIEW', '1', firstPage.bookmark,
+        context(ledger, reviewer),
+        'PENDING_REVIEW',
+        '1',
+        firstPage.bookmark,
       ),
     ) as { items: CredentialRecord[]; bookmark: string };
     expect(secondPage.items).toHaveLength(1);
@@ -415,10 +498,15 @@ describe('GradeContract', () => {
       await contract.ListReviewCredentials(context(ledger, reviewer), 'ACTIVE', '10', ''),
     ) as { items: CredentialRecord[] };
     expect(pending.items).toHaveLength(1);
-    expect(active.items.map((record) => record.credentialId)).toContain(firstPage.items[0]!.credentialId);
+    expect(active.items.map((record) => record.credentialId)).toContain(
+      firstPage.items[0]!.credentialId,
+    );
 
     const student = {
-      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+      id: 'x509::student-alice',
+      mspId: 'UniversityAMSP',
+      role: 'student',
+      subjectHash,
     } as const;
     const mine = JSON.parse(
       await contract.ListMyCredentials(context(ledger, student), '10', ''),
@@ -426,7 +514,9 @@ describe('GradeContract', () => {
     expect(mine.items).toHaveLength(2);
     await expect(
       contract.ListMyCredentials(
-        context(ledger, { ...student, subjectHash: sha256('not-alice') }), '10', '',
+        context(ledger, { ...student, subjectHash: sha256('not-alice') }),
+        '10',
+        '',
       ),
     ).resolves.toContain('"items":[]');
   });
@@ -435,21 +525,32 @@ describe('GradeContract', () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:appeal-list'));
     await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:appeal-list');
     const student = {
-      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+      id: 'x509::student-alice',
+      mspId: 'UniversityAMSP',
+      role: 'student',
+      subjectHash,
     } as const;
-    const details = Buffer.from('{"reason":"Please verify the recorded laboratory score.","salt":"APPEAL_LIST_SAFE_SALT"}');
+    const details = Buffer.from(
+      '{"reason":"Please verify the recorded laboratory score.","salt":"APPEAL_LIST_SAFE_SALT"}',
+    );
     ledger.transient.set('appealDetails', details);
     await contract.SubmitAppeal(
-      context(ledger, student), 'appeal:2026:list01', 'cred:2026:appeal-list', sha256(details),
+      context(ledger, student),
+      'appeal:2026:list01',
+      'cred:2026:appeal-list',
+      sha256(details),
     );
 
     const queue = JSON.parse(
       await contract.ListReviewAppeals(context(ledger, reviewer), 'OPEN', '10', ''),
     ) as { items: AppealRecord[] };
-    const mine = JSON.parse(
-      await contract.ListMyAppeals(context(ledger, student), '10', ''),
-    ) as { items: AppealRecord[] };
-    expect(queue.items[0]).toMatchObject({ appealId: 'appeal:2026:list01', issuerMspId: 'UniversityAMSP' });
+    const mine = JSON.parse(await contract.ListMyAppeals(context(ledger, student), '10', '')) as {
+      items: AppealRecord[];
+    };
+    expect(queue.items[0]).toMatchObject({
+      appealId: 'appeal:2026:list01',
+      issuerMspId: 'UniversityAMSP',
+    });
     expect(mine.items).toHaveLength(1);
   });
 
@@ -457,7 +558,10 @@ describe('GradeContract', () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:share01'));
     await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:share01');
     const student = {
-      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+      id: 'x509::student-alice',
+      mspId: 'UniversityAMSP',
+      role: 'student',
+      subjectHash,
     } as const;
     const access = {
       token: 'A'.repeat(43),
@@ -477,7 +581,11 @@ describe('GradeContract', () => {
     const created = JSON.parse(
       await contract.CreateDisclosureGrant(context(ledger, student), grantInput),
     ) as { status: string; usedCount: number; tokenHash: string };
-    expect(created).toMatchObject({ status: 'ACTIVE', usedCount: 0, tokenHash: sha256(access.token) });
+    expect(created).toMatchObject({
+      status: 'ACTIVE',
+      usedCount: 0,
+      tokenHash: sha256(access.token),
+    });
     expect(JSON.stringify(created)).not.toContain(access.purpose);
     expect(JSON.stringify(created)).not.toContain(access.verifier);
 
@@ -510,18 +618,35 @@ describe('GradeContract', () => {
     await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:share02'));
     await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:share02');
     const student = {
-      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+      id: 'x509::student-alice',
+      mspId: 'UniversityAMSP',
+      role: 'student',
+      subjectHash,
     } as const;
     const token = 'B'.repeat(43);
-    await contract.CreateDisclosureGrant(context(ledger, student), JSON.stringify({
-      grantId: 'grant:2026:share02', credentialId: 'cred:2026:share02',
-      tokenHash: sha256(token), purposeHash: sha256('scholarship verification'),
-      verifierHash: sha256('scholarship committee'), selectedFields: ['score'],
-      expiresAt: '2026-08-25T16:00:00.000Z', maxUses: 1,
-    }));
-    ledger.transient.set('disclosureAccess', Buffer.from(JSON.stringify({
-      token, purpose: 'scholarship verification', verifier: 'wrong verifier',
-    })));
+    await contract.CreateDisclosureGrant(
+      context(ledger, student),
+      JSON.stringify({
+        grantId: 'grant:2026:share02',
+        credentialId: 'cred:2026:share02',
+        tokenHash: sha256(token),
+        purposeHash: sha256('scholarship verification'),
+        verifierHash: sha256('scholarship committee'),
+        selectedFields: ['score'],
+        expiresAt: '2026-08-25T16:00:00.000Z',
+        maxUses: 1,
+      }),
+    );
+    ledger.transient.set(
+      'disclosureAccess',
+      Buffer.from(
+        JSON.stringify({
+          token,
+          purpose: 'scholarship verification',
+          verifier: 'wrong verifier',
+        }),
+      ),
+    );
     await expect(
       contract.ConsumeDisclosureGrant(context(ledger, reviewer), 'grant:2026:share02'),
     ).rejects.toThrow('binding');
@@ -533,24 +658,44 @@ describe('GradeContract', () => {
 
   it('enforces disclosure field, usage and expiry bounds inside chaincode', async () => {
     const student = {
-      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+      id: 'x509::student-alice',
+      mspId: 'UniversityAMSP',
+      role: 'student',
+      subjectHash,
     } as const;
     const base = {
-      grantId: 'grant:2026:bounds01', credentialId: 'cred:2026:missing',
-      tokenHash: sha256('token'), purposeHash: sha256('purpose'), verifierHash: sha256('verifier'),
-      selectedFields: ['grade'], expiresAt: '2026-08-25T16:00:00.000Z', maxUses: 1,
+      grantId: 'grant:2026:bounds01',
+      credentialId: 'cred:2026:missing',
+      tokenHash: sha256('token'),
+      purposeHash: sha256('purpose'),
+      verifierHash: sha256('verifier'),
+      selectedFields: ['grade'],
+      expiresAt: '2026-08-25T16:00:00.000Z',
+      maxUses: 1,
     };
-    await expect(contract.CreateDisclosureGrant(
-      context(ledger, student), JSON.stringify({ ...base, selectedFields: ['salt'] }),
-    )).rejects.toThrow('unsupported');
-    await expect(contract.CreateDisclosureGrant(
-      context(ledger, student), JSON.stringify({ ...base, maxUses: 11 }),
-    )).rejects.toThrow('1 to 10');
-    await expect(contract.CreateDisclosureGrant(
-      context(ledger, student), JSON.stringify({ ...base, expiresAt: '2026-08-24T15:00:00.000Z' }),
-    )).rejects.toThrow('future');
-    await expect(contract.CreateDisclosureGrant(
-      context(ledger, student), JSON.stringify({ ...base, expiresAt: '2026-10-24T16:00:00.000Z' }),
-    )).rejects.toThrow('30 days');
+    await expect(
+      contract.CreateDisclosureGrant(
+        context(ledger, student),
+        JSON.stringify({ ...base, selectedFields: ['salt'] }),
+      ),
+    ).rejects.toThrow('unsupported');
+    await expect(
+      contract.CreateDisclosureGrant(
+        context(ledger, student),
+        JSON.stringify({ ...base, maxUses: 11 }),
+      ),
+    ).rejects.toThrow('1 to 10');
+    await expect(
+      contract.CreateDisclosureGrant(
+        context(ledger, student),
+        JSON.stringify({ ...base, expiresAt: '2026-08-24T15:00:00.000Z' }),
+      ),
+    ).rejects.toThrow('future');
+    await expect(
+      contract.CreateDisclosureGrant(
+        context(ledger, student),
+        JSON.stringify({ ...base, expiresAt: '2026-10-24T16:00:00.000Z' }),
+      ),
+    ).rejects.toThrow('30 days');
   });
 });

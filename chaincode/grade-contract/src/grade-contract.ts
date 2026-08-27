@@ -8,6 +8,7 @@ import type {
   AppealDecision,
   AppealRecord,
   AppealStatus,
+  CredentialBatchInput,
   CredentialDraftInput,
   CredentialRecord,
   CredentialStatus,
@@ -18,7 +19,11 @@ import type {
 } from './model';
 
 const credentialStatuses: CredentialStatus[] = [
-  'PENDING_REVIEW', 'ACTIVE', 'REJECTED', 'SUPERSEDED', 'REVOKED',
+  'PENDING_REVIEW',
+  'ACTIVE',
+  'REJECTED',
+  'SUPERSEDED',
+  'REVOKED',
 ];
 const appealStatuses: AppealStatus[] = ['OPEN', 'RESOLVED_ACCEPTED', 'RESOLVED_REJECTED'];
 const disclosureFields: DisclosureField[] = ['courseName', 'score', 'grade'];
@@ -64,6 +69,85 @@ export class GradeContract extends Contract {
       privateDetails,
     );
     return JSON.stringify(record);
+  }
+
+  public async CreateCredentialBatch(ctx: Context, batchJson: string): Promise<string> {
+    this.assertRole(ctx, 'issuer');
+    const batch = parseJsonObject<CredentialBatchInput>(batchJson, 'credential batch');
+    if (!Array.isArray(batch.drafts) || batch.drafts.length < 1 || batch.drafts.length > 50) {
+      throw new AcademicRecordError(
+        'INVALID_ARGUMENT',
+        'credential batch must contain 1-50 drafts',
+      );
+    }
+
+    const privateBatch = parseJsonObject<Record<string, unknown>>(
+      this.requiredTransient(ctx, 'gradeBatch').toString('utf8'),
+      'gradeBatch',
+    );
+    const seen = new Set<string>();
+    const prepared: Array<{ draft: CredentialDraftInput; privateDetails: Buffer }> = [];
+    for (const candidate of batch.drafts) {
+      const draft = this.validateDraft(candidate);
+      if (seen.has(draft.credentialId)) {
+        throw new AcademicRecordError(
+          'INVALID_ARGUMENT',
+          'credential ids must be unique within a batch',
+        );
+      }
+      seen.add(draft.credentialId);
+      if (await this.CredentialExists(ctx, draft.credentialId)) {
+        throw new AcademicRecordError('ALREADY_EXISTS', `credential ${draft.credentialId} exists`);
+      }
+      const encoded = privateBatch[draft.credentialId];
+      if (typeof encoded !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+        throw new AcademicRecordError(
+          'MISSING_PRIVATE_DATA',
+          `private details missing for ${draft.credentialId}`,
+        );
+      }
+      const privateDetails = Buffer.from(encoded, 'base64');
+      if (privateDetails.length === 0 || privateDetails.toString('base64') !== encoded) {
+        throw new AcademicRecordError(
+          'INVALID_ARGUMENT',
+          `private details encoding is invalid for ${draft.credentialId}`,
+        );
+      }
+      this.assertPayloadHash(privateDetails, draft.detailHash, `gradeBatch.${draft.credentialId}`);
+      prepared.push({ draft, privateDetails });
+    }
+    if (Object.keys(privateBatch).length !== prepared.length) {
+      throw new AcademicRecordError(
+        'INVALID_ARGUMENT',
+        'gradeBatch contains unexpected private entries',
+      );
+    }
+
+    const now = this.transactionTime(ctx);
+    const issuerMspId = ctx.clientIdentity.getMSPID();
+    const submittedByIdentityHash = this.identityHash(ctx);
+    const transactionId = ctx.stub.getTxID();
+    const records: CredentialRecord[] = prepared.map(({ draft }) => ({
+      docType: 'gradeCredential',
+      ...draft,
+      issuerMspId,
+      status: 'PENDING_REVIEW',
+      version: 1,
+      submittedByIdentityHash,
+      issuedAt: now,
+      updatedAt: now,
+      transactionId,
+    }));
+    for (let index = 0; index < records.length; index += 1) {
+      const record = records[index] as CredentialRecord;
+      await this.storeCredential(ctx, record);
+      await ctx.stub.putPrivateData(
+        this.privateCollection(ctx),
+        this.credentialKey(record.credentialId),
+        (prepared[index] as { privateDetails: Buffer }).privateDetails,
+      );
+    }
+    return JSON.stringify(records);
   }
 
   public async CreateAmendmentDraft(
@@ -337,11 +421,13 @@ export class GradeContract extends Contract {
       Buffer.from(privateDetails).toString('utf8'),
       'gradeDetails',
     );
-    return JSON.stringify(Object.fromEntries(
-      record.selectedFields
-        .filter((field) => Object.hasOwn(details, field))
-        .map((field) => [field, details[field]]),
-    ));
+    return JSON.stringify(
+      Object.fromEntries(
+        record.selectedFields
+          .filter((field) => Object.hasOwn(details, field))
+          .map((field) => [field, details[field]]),
+      ),
+    );
   }
 
   public async RevokeDisclosureGrant(ctx: Context, grantId: string): Promise<string> {
@@ -368,14 +454,16 @@ export class GradeContract extends Contract {
   ): Promise<string> {
     this.assertRole(ctx, 'student');
     const subjectHash = this.requiredSubjectHash(ctx);
-    return JSON.stringify(await this.queryIndex<DisclosureGrantRecord>(
-      ctx,
-      'disclosure~subject',
-      [ctx.clientIdentity.getMSPID(), subjectHash],
-      this.parsePageSize(pageSize),
-      bookmark,
-      (id) => this.disclosureKey(id),
-    ));
+    return JSON.stringify(
+      await this.queryIndex<DisclosureGrantRecord>(
+        ctx,
+        'disclosure~subject',
+        [ctx.clientIdentity.getMSPID(), subjectHash],
+        this.parsePageSize(pageSize),
+        bookmark,
+        (id) => this.disclosureKey(id),
+      ),
+    );
   }
 
   public async ReadPrivateCredential(ctx: Context, credentialId: string): Promise<string> {
@@ -523,11 +611,7 @@ export class GradeContract extends Contract {
     );
   }
 
-  public async ListMyAppeals(
-    ctx: Context,
-    pageSize: string,
-    bookmark: string,
-  ): Promise<string> {
+  public async ListMyAppeals(ctx: Context, pageSize: string, bookmark: string): Promise<string> {
     this.assertRole(ctx, 'student');
     const subjectHash = this.requiredSubjectHash(ctx);
     return JSON.stringify(
@@ -600,10 +684,7 @@ export class GradeContract extends Contract {
     return JSON.parse(Buffer.from(state).toString('utf8')) as DisclosureGrantRecord;
   }
 
-  private async assertDisclosureUsable(
-    ctx: Context,
-    record: DisclosureGrantRecord,
-  ): Promise<void> {
+  private async assertDisclosureUsable(ctx: Context, record: DisclosureGrantRecord): Promise<void> {
     if (record.status !== 'ACTIVE') {
       throw new AcademicRecordError('INVALID_STATE', 'only an active disclosure can be consumed');
     }
@@ -625,8 +706,10 @@ export class GradeContract extends Contract {
       'disclosureAccess',
     );
     if (
-      typeof access.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(access.token) ||
-      typeof access.purpose !== 'string' || typeof access.verifier !== 'string'
+      typeof access.token !== 'string' ||
+      !/^[A-Za-z0-9_-]{43}$/.test(access.token) ||
+      typeof access.purpose !== 'string' ||
+      typeof access.verifier !== 'string'
     ) {
       throw new AcademicRecordError('INVALID_ARGUMENT', 'disclosure access is malformed');
     }
@@ -647,7 +730,9 @@ export class GradeContract extends Contract {
     if (previousStatus && previousStatus !== record.status) {
       await ctx.stub.deleteState(
         ctx.stub.createCompositeKey('credential~status', [
-          record.issuerMspId, previousStatus, record.credentialId,
+          record.issuerMspId,
+          previousStatus,
+          record.credentialId,
         ]),
       );
     }
@@ -661,13 +746,17 @@ export class GradeContract extends Contract {
   private async putCredentialIndexes(ctx: Context, record: CredentialRecord): Promise<void> {
     await ctx.stub.putState(
       ctx.stub.createCompositeKey('credential~status', [
-        record.issuerMspId, record.status, record.credentialId,
+        record.issuerMspId,
+        record.status,
+        record.credentialId,
       ]),
       Buffer.from([0]),
     );
     await ctx.stub.putState(
       ctx.stub.createCompositeKey('credential~subject', [
-        record.issuerMspId, record.subjectHash, record.credentialId,
+        record.issuerMspId,
+        record.subjectHash,
+        record.credentialId,
       ]),
       Buffer.from([0]),
     );
@@ -681,20 +770,26 @@ export class GradeContract extends Contract {
     if (previousStatus && previousStatus !== record.status) {
       await ctx.stub.deleteState(
         ctx.stub.createCompositeKey('appeal~status', [
-          record.issuerMspId, previousStatus, record.appealId,
+          record.issuerMspId,
+          previousStatus,
+          record.appealId,
         ]),
       );
     }
     await ctx.stub.putState(this.appealKey(record.appealId), Buffer.from(JSON.stringify(record)));
     await ctx.stub.putState(
       ctx.stub.createCompositeKey('appeal~status', [
-        record.issuerMspId, record.status, record.appealId,
+        record.issuerMspId,
+        record.status,
+        record.appealId,
       ]),
       Buffer.from([0]),
     );
     await ctx.stub.putState(
       ctx.stub.createCompositeKey('appeal~subject', [
-        record.issuerMspId, record.subjectHash, record.appealId,
+        record.issuerMspId,
+        record.subjectHash,
+        record.appealId,
       ]),
       Buffer.from([0]),
     );
@@ -707,7 +802,9 @@ export class GradeContract extends Contract {
     );
     await ctx.stub.putState(
       ctx.stub.createCompositeKey('disclosure~subject', [
-        record.issuerMspId, record.subjectHash, record.grantId,
+        record.issuerMspId,
+        record.subjectHash,
+        record.grantId,
       ]),
       Buffer.from([0]),
     );
@@ -804,7 +901,8 @@ export class GradeContract extends Contract {
 
   private requiredSubjectHash(ctx: Context): string {
     const subjectHash = ctx.clientIdentity.getAttributeValue('subject.hash');
-    if (!subjectHash) throw new AcademicRecordError('FORBIDDEN', 'subject.hash attribute is required');
+    if (!subjectHash)
+      throw new AcademicRecordError('FORBIDDEN', 'subject.hash attribute is required');
     assertSha256(subjectHash, 'subject.hash');
     return subjectHash;
   }
@@ -836,7 +934,10 @@ export class GradeContract extends Contract {
       new Set(input.selectedFields).size !== input.selectedFields.length ||
       input.selectedFields.some((field) => !disclosureFields.includes(field))
     ) {
-      throw new AcademicRecordError('INVALID_ARGUMENT', 'selectedFields contains unsupported values');
+      throw new AcademicRecordError(
+        'INVALID_ARGUMENT',
+        'selectedFields contains unsupported values',
+      );
     }
     if (!Number.isInteger(input.maxUses) || input.maxUses < 1 || input.maxUses > 10) {
       throw new AcademicRecordError('INVALID_ARGUMENT', 'maxUses must be an integer from 1 to 10');

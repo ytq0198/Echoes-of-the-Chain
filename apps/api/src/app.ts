@@ -33,7 +33,7 @@ export function buildApp(options: AppOptions = {}) {
   app.get('/api/v1/meta', async () => ({
     product: 'ChainGrade',
     repository: 'Echoes-of-the-Chain',
-    phase: 'iteration-8',
+    phase: 'iteration-9',
     ledgerMode: options.ledgerMode ?? (options.ledger ? 'demo' : 'unavailable'),
     capabilities: [
       'credential-draft',
@@ -43,6 +43,7 @@ export function buildApp(options: AppOptions = {}) {
       'appeal',
       'fabric-gateway',
       'bounded-disclosure',
+      'atomic-grade-import',
     ],
   }));
 

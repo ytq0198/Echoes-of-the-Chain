@@ -96,6 +96,39 @@ export class DemoCredentialLedger implements CredentialLedger {
     return record;
   }
 
+  async createBatchDrafts(commands: CreateCredentialCommand[]): Promise<PublicCredentialRecord[]> {
+    if (commands.length < 1 || commands.length > 50)
+      throw new Error('INVALID_ARGUMENT: Batch size must be 1-50');
+    const identifiers = commands.map((command) => command.credentialId);
+    if (new Set(identifiers).size !== identifiers.length)
+      throw new Error('INVALID_ARGUMENT: Duplicate credential id');
+    if (identifiers.some((identifier) => this.credentials.has(identifier))) {
+      throw new Error('ALREADY_EXISTS: Credential already exists');
+    }
+    const now = new Date().toISOString();
+    const batchTransactionId = transactionId();
+    const records = commands.map((command): PublicCredentialRecord => ({
+      docType: 'gradeCredential',
+      credentialId: command.credentialId,
+      subjectHash: command.subjectHash,
+      courseHash: command.courseHash,
+      detailHash: command.detailHash,
+      issuerMspId: 'Org1MSP',
+      schemaVersion: command.schemaVersion,
+      status: 'PENDING_REVIEW',
+      version: 1,
+      submittedByIdentityHash: DEMO_ACTOR,
+      issuedAt: now,
+      updatedAt: now,
+      transactionId: batchTransactionId,
+    }));
+    records.forEach((record, index) => {
+      this.credentials.set(record.credentialId, record);
+      this.details.set(record.credentialId, decodePrivateDetails(commands[index]!.privateDetails));
+    });
+    return records;
+  }
+
   async createAmendment(
     previousCredentialId: string,
     command: CreateCredentialCommand,

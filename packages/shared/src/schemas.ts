@@ -56,6 +56,39 @@ export const createCredentialRequestSchema = z.object({
   details: gradeDetailsSchema,
 });
 
+export const gradeImportRowSchema = z.object({
+  credentialId: identifierSchema,
+  subjectHash: sha256Schema,
+  courseHash: sha256Schema,
+  schemaVersion: z.string().regex(/^\d+\.\d+$/),
+  details: z.object({
+    courseName: z.string().trim().min(1).max(200),
+    score: z.coerce.number().min(0).max(100),
+    grade: z.string().trim().min(1).max(16),
+    salt: z.string().min(16).max(256),
+  }),
+});
+
+export const gradeBatchImportRequestSchema = z.object({
+  rows: z
+    .array(gradeImportRowSchema)
+    .min(1)
+    .max(50)
+    .superRefine((rows, context) => {
+      const seen = new Set<string>();
+      rows.forEach((row, index) => {
+        if (seen.has(row.credentialId)) {
+          context.addIssue({
+            code: 'custom',
+            path: [index, 'credentialId'],
+            message: 'credentialId must be unique within a batch',
+          });
+        }
+        seen.add(row.credentialId);
+      });
+    }),
+});
+
 export const createAmendmentRequestSchema = z.object({
   credentialId: identifierSchema,
   schemaVersion: z.string().regex(/^\d+\.\d+$/),
@@ -81,7 +114,10 @@ const disclosureFieldSchema = z.enum(disclosureFields);
 
 export const createDisclosureRequestSchema = z.object({
   grantId: identifierSchema,
-  selectedFields: z.array(disclosureFieldSchema).min(1).max(disclosureFields.length)
+  selectedFields: z
+    .array(disclosureFieldSchema)
+    .min(1)
+    .max(disclosureFields.length)
     .refine((fields) => new Set(fields).size === fields.length, 'selected fields must be unique'),
   purpose: z.string().trim().min(4).max(200),
   verifier: z.string().trim().min(4).max(200),
