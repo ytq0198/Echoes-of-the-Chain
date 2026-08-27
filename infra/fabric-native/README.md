@@ -11,7 +11,31 @@ This fallback runs Fabric directly from the pinned binaries already downloaded b
 ./infra/fabric-native/native-network.sh down
 ./infra/fabric-native/deploy-chaincode.sh deploy
 ./infra/fabric-native/deploy-chaincode.sh status
+./infra/fabric-native/ledger-info.sh
 ```
+
+首次安装使用 `deploy`；以后在账本重启后使用 `start`，它只连接既有链码定义，
+不会重复执行生命周期提交。`deploy` 本身也会检测已提交定义，因此可安全重复执行。
+
+## 账本冷备份与恢复
+
+```bash
+./infra/fabric-native/backup-runtime.sh
+./infra/fabric-native/verify-backup.sh \
+  /mnt/localDisk3/weizian/chaingrade-backups/native-ledger-<UTC>.tar.gz
+```
+
+备份脚本会短暂停止链码、Peer 与 Orderer，生成 SHA-256 校验文件，验证归档路径，
+随后按原状态重启网络并核对双组织账本。恢复是受保护操作，只有传入显式确认参数才执行：
+
+```bash
+./infra/fabric-native/restore-runtime.sh \
+  /mnt/localDisk3/weizian/chaingrade-backups/native-ledger-<UTC>.tar.gz \
+  --confirm-restore
+```
+
+恢复前的运行目录不会删除，而会移动到带 UTC 时间戳的
+`.runtime/native-fabric.pre-restore-*` 目录，以便人工回退。
 
 The backup contains peer/orderer/application MSP private keys and therefore remains outside Git with mode `0600`. Docker-owned Fabric CA server internals are deliberately excluded; they are not required to restart the retained nodes. Set `CHAINGRADE_BACKUP_ROOT` only to another directory below `/mnt/localDisk3/weizian`.
 
