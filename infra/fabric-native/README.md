@@ -12,10 +12,13 @@ This fallback runs Fabric directly from the pinned binaries already downloaded b
 ./infra/fabric-native/deploy-chaincode.sh deploy
 ./infra/fabric-native/deploy-chaincode.sh status
 ./infra/fabric-native/ledger-info.sh
+.tools/node/bin/corepack pnpm --filter @chaingrade/api seed:native
 ```
 
 首次安装使用 `deploy`；以后在账本重启后使用 `start`，它只连接既有链码定义，
 不会重复执行生命周期提交。`deploy` 本身也会检测已提交定义，因此可安全重复执行。
+播种命令会确保固定演示凭证为 `ACTIVE`，并确保其轻量申诉为 `OPEN`；重复执行只校验
+公共承诺、私有成绩可读性和验真结论，不重复创建交易。
 
 ## 账本冷备份与恢复
 
