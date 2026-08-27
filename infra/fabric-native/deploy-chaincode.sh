@@ -23,6 +23,7 @@ CHAINCODE_ADDRESS=127.0.0.1:9999
 PACKAGE_FILE="${PACKAGE_ROOT}/${CHAINCODE_LABEL}.tgz"
 
 mkdir -p "${PACKAGE_ROOT}" "${PID_ROOT}" "${LOG_ROOT}"
+export FABRIC_CFG_PATH="${CONFIG_ROOT}"
 
 configure_org() {
   local org="$1"
