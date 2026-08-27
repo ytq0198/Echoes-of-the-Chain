@@ -1,4 +1,10 @@
-import type { LedgerPage, PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
+import type {
+  DisclosureField,
+  LedgerPage,
+  PublicAppealRecord,
+  PublicCredentialRecord,
+  PublicDisclosureGrant,
+} from '@chaingrade/shared';
 
 export type FabricActor = 'issuer' | 'reviewer' | 'student';
 
@@ -31,6 +37,22 @@ export interface CredentialDecisionCommand {
   privateDecision: Uint8Array;
 }
 
+export interface CreateDisclosureCommand {
+  grantId: string;
+  credentialId: string;
+  tokenHash: string;
+  purposeHash: string;
+  verifierHash: string;
+  selectedFields: DisclosureField[];
+  expiresAt: string;
+  maxUses: number;
+}
+
+export interface ConsumeDisclosureCommand {
+  grantId: string;
+  privateAccess: Uint8Array;
+}
+
 export interface CredentialVerification {
   credentialId: string;
   authentic: boolean;
@@ -57,6 +79,11 @@ export interface CredentialLedger {
   listMine(pageSize: number, bookmark: string): Promise<LedgerPage<PublicCredentialRecord>>;
   readPrivateDetails(credentialId: string): Promise<Record<string, unknown>>;
   verify(credentialId: string, expectedDetailHash?: string): Promise<CredentialVerification>;
+  createDisclosure(command: CreateDisclosureCommand): Promise<PublicDisclosureGrant>;
+  evaluateDisclosure(command: ConsumeDisclosureCommand): Promise<Partial<Record<DisclosureField, unknown>>>;
+  consumeDisclosure(command: ConsumeDisclosureCommand): Promise<PublicDisclosureGrant>;
+  revokeDisclosure(grantId: string): Promise<PublicDisclosureGrant>;
+  listMyDisclosures(pageSize: number, bookmark: string): Promise<LedgerPage<PublicDisclosureGrant>>;
   submitAppeal(command: CreateAppealCommand): Promise<PublicAppealRecord>;
   reviewAppeal(command: ReviewAppealCommand): Promise<PublicAppealRecord>;
   readAppeal(appealId: string): Promise<PublicAppealRecord>;

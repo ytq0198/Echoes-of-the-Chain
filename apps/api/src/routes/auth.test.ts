@@ -22,6 +22,8 @@ function ledger(): CredentialLedger {
     createDraft: vi.fn(), createAmendment: vi.fn(), approve: vi.fn(), reject: vi.fn(), revoke: vi.fn(), read: vi.fn(),
     listIssued: vi.fn(), listForReview: vi.fn(), listMine: vi.fn(),
     readPrivateDetails: vi.fn(async () => ({ score: 92 })), verify: vi.fn(),
+    createDisclosure: vi.fn(), evaluateDisclosure: vi.fn(), consumeDisclosure: vi.fn(),
+    revokeDisclosure: vi.fn(), listMyDisclosures: vi.fn(),
     submitAppeal: vi.fn(), reviewAppeal: vi.fn(), readAppeal: vi.fn(),
     listAppealsForReview: vi.fn(), listMyAppeals: vi.fn(), close: vi.fn(),
   };
@@ -60,6 +62,10 @@ describe('authentication routes', () => {
     const studentCookie = studentLogin.headers['set-cookie']?.split(';')[0] ?? '';
     const studentPrivateRead = await app.inject({ method: 'GET', url: '/api/v1/credentials/cred:2026:api01/private-details', headers: { cookie: studentCookie } });
     expect(studentPrivateRead.json()).toMatchObject({ score: 92 });
+    const disclosureWithoutCsrf = await app.inject({ method: 'POST', url: '/api/v1/credentials/cred:2026:api01/disclosures', headers: { cookie: studentCookie, origin }, payload: {} });
+    expect(disclosureWithoutCsrf.json()).toMatchObject({ code: 'CSRF_INVALID' });
+    const issuerDisclosure = await app.inject({ method: 'POST', url: '/api/v1/credentials/cred:2026:api01/disclosures', headers: { cookie: issuerCookie, origin, 'x-csrf-token': issuerLogin.json().csrfToken }, payload: {} });
+    expect(issuerDisclosure.json()).toMatchObject({ code: 'ROLE_FORBIDDEN' });
     const wrongRole = await app.inject({ method: 'POST', url: '/api/v1/credentials/drafts', headers: { cookie: studentCookie, origin, 'x-csrf-token': studentLogin.json().csrfToken }, payload: {} });
     expect(wrongRole.json()).toMatchObject({ code: 'ROLE_FORBIDDEN' });
     await app.close();

@@ -13,11 +13,15 @@ import {
   type Signer,
   signers,
 } from '@hyperledger/fabric-gateway';
-import type { LedgerPage, PublicAppealRecord, PublicCredentialRecord } from '@chaingrade/shared';
+import type {
+  LedgerPage, PublicAppealRecord, PublicCredentialRecord, PublicDisclosureGrant,
+} from '@chaingrade/shared';
 
 import type { FabricConfig } from './fabric-config.js';
 import type {
   CreateCredentialCommand,
+  CreateDisclosureCommand,
+  ConsumeDisclosureCommand,
   CredentialDecisionCommand,
   CreateAppealCommand,
   CredentialLedger,
@@ -132,6 +136,46 @@ export class FabricCredentialLedger implements CredentialLedger {
     return decodeJson<CredentialVerification>(
       await contract.evaluateTransaction('VerifyCredential', credentialId, expectedDetailHash),
     );
+  }
+
+  public async createDisclosure(command: CreateDisclosureCommand): Promise<PublicDisclosureGrant> {
+    const contract = await this.contractFor('student');
+    return decodeJson<PublicDisclosureGrant>(await contract.submitTransaction(
+      'CreateDisclosureGrant',
+      JSON.stringify(command),
+    ));
+  }
+
+  public async evaluateDisclosure(
+    command: ConsumeDisclosureCommand,
+  ): Promise<Record<string, unknown>> {
+    const contract = await this.contractFor('reviewer');
+    return decodeJson<Record<string, unknown>>(await contract.evaluate('EvaluateDisclosureGrant', {
+      arguments: [command.grantId],
+      transientData: { disclosureAccess: command.privateAccess },
+    }));
+  }
+
+  public async consumeDisclosure(command: ConsumeDisclosureCommand): Promise<PublicDisclosureGrant> {
+    const contract = await this.contractFor('reviewer');
+    return decodeJson<PublicDisclosureGrant>(await contract.submit('ConsumeDisclosureGrant', {
+      arguments: [command.grantId],
+      transientData: { disclosureAccess: command.privateAccess },
+    }));
+  }
+
+  public async revokeDisclosure(grantId: string): Promise<PublicDisclosureGrant> {
+    const contract = await this.contractFor('student');
+    return decodeJson<PublicDisclosureGrant>(
+      await contract.submitTransaction('RevokeDisclosureGrant', grantId),
+    );
+  }
+
+  public async listMyDisclosures(
+    pageSize: number,
+    bookmark: string,
+  ): Promise<LedgerPage<PublicDisclosureGrant>> {
+    return this.evaluatePage('student', 'ListMyDisclosureGrants', [String(pageSize), bookmark]);
   }
 
   public async submitAppeal(command: CreateAppealCommand): Promise<PublicAppealRecord> {

@@ -38,6 +38,8 @@ function mockLedger(): CredentialLedger {
     listMine: vi.fn(),
     readPrivateDetails: vi.fn(),
     verify: vi.fn(),
+    createDisclosure: vi.fn(), evaluateDisclosure: vi.fn(), consumeDisclosure: vi.fn(),
+    revokeDisclosure: vi.fn(), listMyDisclosures: vi.fn(),
     submitAppeal: vi.fn(async (command) =>
       appealRecord({ appealId: command.appealId, credentialId: command.credentialId, reasonHash: command.reasonHash }),
     ),

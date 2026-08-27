@@ -11,6 +11,9 @@ import type {
   CredentialDraftInput,
   CredentialRecord,
   CredentialStatus,
+  DisclosureField,
+  DisclosureGrantInput,
+  DisclosureGrantRecord,
   LedgerPage,
 } from './model';
 
@@ -18,6 +21,8 @@ const credentialStatuses: CredentialStatus[] = [
   'PENDING_REVIEW', 'ACTIVE', 'REJECTED', 'SUPERSEDED', 'REVOKED',
 ];
 const appealStatuses: AppealStatus[] = ['OPEN', 'RESOLVED_ACCEPTED', 'RESOLVED_REJECTED'];
+const disclosureFields: DisclosureField[] = ['courseName', 'score', 'grade'];
+const maximumDisclosureLifetimeMs = 30 * 24 * 60 * 60 * 1_000;
 
 export class GradeContract extends Contract {
   public constructor() {
@@ -259,6 +264,120 @@ export class GradeContract extends Contract {
     );
   }
 
+  public async CreateDisclosureGrant(ctx: Context, grantJson: string): Promise<string> {
+    this.assertRole(ctx, 'student');
+    const input = this.validateDisclosureGrant(
+      parseJsonObject<DisclosureGrantInput>(grantJson, 'grant'),
+      this.transactionMillis(ctx),
+    );
+    const credential = await this.readCredentialRecord(ctx, input.credentialId);
+    this.assertSameOrganization(ctx, credential.issuerMspId);
+    const subjectHash = this.requiredSubjectHash(ctx);
+    if (credential.subjectHash !== subjectHash) {
+      throw new AcademicRecordError('FORBIDDEN', 'students may share only their own credential');
+    }
+    if (credential.status !== 'ACTIVE') {
+      throw new AcademicRecordError('INVALID_STATE', 'only an active credential can be shared');
+    }
+    if ((await ctx.stub.getState(this.disclosureKey(input.grantId))).length > 0) {
+      throw new AcademicRecordError('ALREADY_EXISTS', `disclosure ${input.grantId} exists`);
+    }
+
+    const now = this.transactionTime(ctx);
+    const record: DisclosureGrantRecord = {
+      docType: 'gradeDisclosureGrant',
+      ...input,
+      subjectHash,
+      issuerMspId: credential.issuerMspId,
+      usedCount: 0,
+      status: 'ACTIVE',
+      createdByIdentityHash: this.identityHash(ctx),
+      createdAt: now,
+      updatedAt: now,
+      transactionId: ctx.stub.getTxID(),
+    };
+    await this.storeDisclosure(ctx, record);
+    return JSON.stringify(record);
+  }
+
+  public async ConsumeDisclosureGrant(ctx: Context, grantId: string): Promise<string> {
+    this.assertRole(ctx, 'reviewer');
+    const record = await this.readDisclosureRecord(ctx, grantId);
+    this.assertSameOrganization(ctx, record.issuerMspId);
+    await this.assertDisclosureUsable(ctx, record);
+    this.assertDisclosureAccess(ctx, record);
+
+    record.usedCount += 1;
+    record.status = record.usedCount >= record.maxUses ? 'CONSUMED' : 'ACTIVE';
+    record.lastConsumedByIdentityHash = this.identityHash(ctx);
+    record.updatedAt = this.transactionTime(ctx);
+    record.transactionId = ctx.stub.getTxID();
+    await this.storeDisclosure(ctx, record);
+    return JSON.stringify(record);
+  }
+
+  public async ReadDisclosureGrant(ctx: Context, grantId: string): Promise<string> {
+    return JSON.stringify(await this.readDisclosureRecord(ctx, grantId));
+  }
+
+  public async EvaluateDisclosureGrant(ctx: Context, grantId: string): Promise<string> {
+    this.assertRole(ctx, 'reviewer');
+    const record = await this.readDisclosureRecord(ctx, grantId);
+    this.assertSameOrganization(ctx, record.issuerMspId);
+    await this.assertDisclosureUsable(ctx, record);
+    this.assertDisclosureAccess(ctx, record);
+    const privateDetails = await ctx.stub.getPrivateData(
+      `_implicit_org_${record.issuerMspId}`,
+      this.credentialKey(record.credentialId),
+    );
+    if (!privateDetails || privateDetails.length === 0) {
+      throw new AcademicRecordError('MISSING_PRIVATE_DATA', 'credential details are unavailable');
+    }
+    const details = parseJsonObject<Record<string, unknown>>(
+      Buffer.from(privateDetails).toString('utf8'),
+      'gradeDetails',
+    );
+    return JSON.stringify(Object.fromEntries(
+      record.selectedFields
+        .filter((field) => Object.hasOwn(details, field))
+        .map((field) => [field, details[field]]),
+    ));
+  }
+
+  public async RevokeDisclosureGrant(ctx: Context, grantId: string): Promise<string> {
+    this.assertRole(ctx, 'student');
+    const record = await this.readDisclosureRecord(ctx, grantId);
+    this.assertSameOrganization(ctx, record.issuerMspId);
+    if (record.subjectHash !== this.requiredSubjectHash(ctx)) {
+      throw new AcademicRecordError('FORBIDDEN', 'students may revoke only their own disclosure');
+    }
+    if (record.status !== 'ACTIVE') {
+      throw new AcademicRecordError('INVALID_STATE', 'only an active disclosure can be revoked');
+    }
+    record.status = 'REVOKED';
+    record.updatedAt = this.transactionTime(ctx);
+    record.transactionId = ctx.stub.getTxID();
+    await this.storeDisclosure(ctx, record);
+    return JSON.stringify(record);
+  }
+
+  public async ListMyDisclosureGrants(
+    ctx: Context,
+    pageSize: string,
+    bookmark: string,
+  ): Promise<string> {
+    this.assertRole(ctx, 'student');
+    const subjectHash = this.requiredSubjectHash(ctx);
+    return JSON.stringify(await this.queryIndex<DisclosureGrantRecord>(
+      ctx,
+      'disclosure~subject',
+      [ctx.clientIdentity.getMSPID(), subjectHash],
+      this.parsePageSize(pageSize),
+      bookmark,
+      (id) => this.disclosureKey(id),
+    ));
+  }
+
   public async ReadPrivateCredential(ctx: Context, credentialId: string): Promise<string> {
     this.assertRole(ctx, 'student');
     const record = await this.readCredentialRecord(ctx, credentialId);
@@ -469,6 +588,57 @@ export class GradeContract extends Contract {
     return JSON.parse(Buffer.from(state).toString('utf8')) as AppealRecord;
   }
 
+  private async readDisclosureRecord(
+    ctx: Context,
+    grantId: string,
+  ): Promise<DisclosureGrantRecord> {
+    assertIdentifier(grantId, 'grantId');
+    const state = await ctx.stub.getState(this.disclosureKey(grantId));
+    if (state.length === 0) {
+      throw new AcademicRecordError('NOT_FOUND', `disclosure ${grantId} does not exist`);
+    }
+    return JSON.parse(Buffer.from(state).toString('utf8')) as DisclosureGrantRecord;
+  }
+
+  private async assertDisclosureUsable(
+    ctx: Context,
+    record: DisclosureGrantRecord,
+  ): Promise<void> {
+    if (record.status !== 'ACTIVE') {
+      throw new AcademicRecordError('INVALID_STATE', 'only an active disclosure can be consumed');
+    }
+    if (this.transactionMillis(ctx) >= Date.parse(record.expiresAt)) {
+      throw new AcademicRecordError('EXPIRED', 'disclosure authorization has expired');
+    }
+    if (record.usedCount >= record.maxUses) {
+      throw new AcademicRecordError('INVALID_STATE', 'disclosure authorization is exhausted');
+    }
+    const credential = await this.readCredentialRecord(ctx, record.credentialId);
+    if (credential.status !== 'ACTIVE') {
+      throw new AcademicRecordError('INVALID_STATE', 'the linked credential is no longer active');
+    }
+  }
+
+  private assertDisclosureAccess(ctx: Context, record: DisclosureGrantRecord): void {
+    const access = parseJsonObject<{ token: string; purpose: string; verifier: string }>(
+      this.requiredTransient(ctx, 'disclosureAccess').toString('utf8'),
+      'disclosureAccess',
+    );
+    if (
+      typeof access.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(access.token) ||
+      typeof access.purpose !== 'string' || typeof access.verifier !== 'string'
+    ) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'disclosure access is malformed');
+    }
+    if (
+      this.hashText(access.token) !== record.tokenHash ||
+      this.hashText(access.purpose.trim()) !== record.purposeHash ||
+      this.hashText(access.verifier.trim()) !== record.verifierHash
+    ) {
+      throw new AcademicRecordError('FORBIDDEN', 'disclosure access binding does not match');
+    }
+  }
+
   private async storeCredential(
     ctx: Context,
     record: CredentialRecord,
@@ -525,6 +695,19 @@ export class GradeContract extends Contract {
     await ctx.stub.putState(
       ctx.stub.createCompositeKey('appeal~subject', [
         record.issuerMspId, record.subjectHash, record.appealId,
+      ]),
+      Buffer.from([0]),
+    );
+  }
+
+  private async storeDisclosure(ctx: Context, record: DisclosureGrantRecord): Promise<void> {
+    await ctx.stub.putState(
+      this.disclosureKey(record.grantId),
+      Buffer.from(JSON.stringify(record)),
+    );
+    await ctx.stub.putState(
+      ctx.stub.createCompositeKey('disclosure~subject', [
+        record.issuerMspId, record.subjectHash, record.grantId,
       ]),
       Buffer.from([0]),
     );
@@ -637,6 +820,37 @@ export class GradeContract extends Contract {
     return draft;
   }
 
+  private validateDisclosureGrant(
+    input: DisclosureGrantInput,
+    transactionMillis: number,
+  ): DisclosureGrantInput {
+    assertIdentifier(input.grantId, 'grantId');
+    assertIdentifier(input.credentialId, 'credentialId');
+    assertSha256(input.tokenHash, 'tokenHash');
+    assertSha256(input.purposeHash, 'purposeHash');
+    assertSha256(input.verifierHash, 'verifierHash');
+    if (!Array.isArray(input.selectedFields) || input.selectedFields.length < 1) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'selectedFields cannot be empty');
+    }
+    if (
+      new Set(input.selectedFields).size !== input.selectedFields.length ||
+      input.selectedFields.some((field) => !disclosureFields.includes(field))
+    ) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'selectedFields contains unsupported values');
+    }
+    if (!Number.isInteger(input.maxUses) || input.maxUses < 1 || input.maxUses > 10) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'maxUses must be an integer from 1 to 10');
+    }
+    const expiresAt = Date.parse(input.expiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= transactionMillis) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'expiresAt must be in the future');
+    }
+    if (expiresAt - transactionMillis > maximumDisclosureLifetimeMs) {
+      throw new AcademicRecordError('INVALID_ARGUMENT', 'expiresAt cannot exceed 30 days');
+    }
+    return input;
+  }
+
   private assertRole(ctx: Context, expected: string): void {
     const actual = ctx.clientIdentity.getAttributeValue('app.role');
     if (actual !== expected) {
@@ -670,10 +884,17 @@ export class GradeContract extends Contract {
   }
 
   private transactionTime(ctx: Context): string {
+    return new Date(this.transactionMillis(ctx)).toISOString();
+  }
+
+  private transactionMillis(ctx: Context): number {
     const timestamp = ctx.stub.getTxTimestamp();
     const seconds = Number(timestamp.seconds.toString());
-    const millis = seconds * 1000 + Math.floor(timestamp.nanos / 1_000_000);
-    return new Date(millis).toISOString();
+    return seconds * 1000 + Math.floor(timestamp.nanos / 1_000_000);
+  }
+
+  private hashText(value: string): string {
+    return createHash('sha256').update(value).digest('hex');
   }
 
   private privateCollection(ctx: Context): string {
@@ -686,5 +907,9 @@ export class GradeContract extends Contract {
 
   private appealKey(appealId: string): string {
     return `appeal:${appealId}`;
+  }
+
+  private disclosureKey(grantId: string): string {
+    return `disclosure:${grantId}`;
   }
 }

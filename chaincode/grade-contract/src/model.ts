@@ -47,3 +47,31 @@ export interface LedgerPage<T> {
   bookmark: string;
   fetchedRecordsCount: number;
 }
+
+export type DisclosureStatus = 'ACTIVE' | 'CONSUMED' | 'REVOKED';
+
+export type DisclosureField = 'courseName' | 'score' | 'grade';
+
+export interface DisclosureGrantInput {
+  grantId: string;
+  credentialId: string;
+  tokenHash: string;
+  purposeHash: string;
+  verifierHash: string;
+  selectedFields: DisclosureField[];
+  expiresAt: string;
+  maxUses: number;
+}
+
+export interface DisclosureGrantRecord extends DisclosureGrantInput {
+  docType: 'gradeDisclosureGrant';
+  subjectHash: string;
+  issuerMspId: string;
+  usedCount: number;
+  status: DisclosureStatus;
+  createdByIdentityHash: string;
+  lastConsumedByIdentityHash?: string;
+  createdAt: string;
+  updatedAt: string;
+  transactionId: string;
+}

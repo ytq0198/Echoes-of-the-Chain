@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { PublicCredentialRecord } from '@chaingrade/shared';
+import type { PublicCredentialRecord, PublicDisclosureGrant } from '@chaingrade/shared';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../app.js';
@@ -25,6 +25,18 @@ function activeRecord(overrides: Partial<PublicCredentialRecord> = {}): PublicCr
     updatedAt: '2026-08-25T00:01:00.000Z',
     transactionId: 'tx-api-01',
     ...overrides,
+  };
+}
+
+function disclosureGrant(overrides: Partial<PublicDisclosureGrant> = {}): PublicDisclosureGrant {
+  return {
+    docType: 'gradeDisclosureGrant', grantId: 'grant:2026:api01',
+    credentialId: 'cred:2026:api01', subjectHash: hash, issuerMspId: 'Org1MSP',
+    tokenHash: hash, purposeHash: hash, verifierHash: hash,
+    selectedFields: ['courseName', 'grade'], expiresAt: '2026-08-28T12:00:00.000Z',
+    maxUses: 2, usedCount: 0, status: 'ACTIVE', createdByIdentityHash: hash,
+    createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
+    transactionId: 'tx-grant-01', ...overrides,
   };
 }
 
@@ -53,7 +65,7 @@ function mockLedger(): CredentialLedger {
     listIssued: vi.fn(async (status) => ({ items: [activeRecord({ status })], bookmark: '', fetchedRecordsCount: 1 })),
     listForReview: vi.fn(async (status) => ({ items: [activeRecord({ status })], bookmark: '', fetchedRecordsCount: 1 })),
     listMine: vi.fn(async () => ({ items: [activeRecord()], bookmark: '', fetchedRecordsCount: 1 })),
-    readPrivateDetails: vi.fn(async () => ({ score: 92, grade: 'A' })),
+    readPrivateDetails: vi.fn(async () => ({ courseName: '区块链技术与应用', score: 92, grade: 'A' })),
     verify: vi.fn(async (credentialId) => ({
       credentialId,
       authentic: true,
@@ -63,6 +75,22 @@ function mockLedger(): CredentialLedger {
       version: 1,
       updatedAt: '2026-08-25T00:01:00.000Z',
       transactionId: 'tx-api-01',
+    })),
+    createDisclosure: vi.fn(async (command) => disclosureGrant({
+      grantId: command.grantId, credentialId: command.credentialId,
+      tokenHash: command.tokenHash, purposeHash: command.purposeHash,
+      verifierHash: command.verifierHash, selectedFields: command.selectedFields,
+      expiresAt: command.expiresAt, maxUses: command.maxUses,
+    })),
+    evaluateDisclosure: vi.fn(async () => ({ courseName: '区块链技术与应用', grade: 'A' })),
+    consumeDisclosure: vi.fn(async (command) => disclosureGrant({
+      grantId: command.grantId, usedCount: 1,
+    })),
+    revokeDisclosure: vi.fn(async (grantId) => disclosureGrant({
+      grantId, status: 'REVOKED',
+    })),
+    listMyDisclosures: vi.fn(async () => ({
+      items: [disclosureGrant()], bookmark: '', fetchedRecordsCount: 1,
     })),
     submitAppeal: vi.fn(),
     reviewAppeal: vi.fn(),
@@ -177,6 +205,61 @@ describe('credential routes', () => {
     expect(response.json().items).toHaveLength(1);
     const invalid = await app.inject({ method: 'GET', url: '/api/v1/credentials/review-queue?pageSize=100' });
     expect(invalid.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('creates a one-time disclosure token without returning private grade details', async () => {
+    const ledger = mockLedger();
+    const app = buildApp({ ledger });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/credentials/cred:2026:api01/disclosures',
+      payload: {
+        grantId: 'grant:2026:api01',
+        selectedFields: ['courseName', 'grade'],
+        purpose: '研究生申请材料核验',
+        verifier: '目标院校招生办公室',
+        expiresAt: '2026-08-28T12:00:00.000Z',
+        maxUses: 2,
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.json().token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(response.body).not.toContain('score');
+    expect(ledger.createDisclosure).toHaveBeenCalledWith(expect.objectContaining({
+      credentialId: 'cred:2026:api01',
+      purposeHash: createHash('sha256').update('研究生申请材料核验').digest('hex'),
+      verifierHash: createHash('sha256').update('目标院校招生办公室').digest('hex'),
+      selectedFields: ['courseName', 'grade'],
+      maxUses: 2,
+    }));
+    await app.close();
+  });
+
+  it('consumes a disclosure with no-store and only returns selected fields', async () => {
+    const ledger = mockLedger();
+    const app = buildApp({ ledger });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/disclosures/grant:2026:api01/consume',
+      payload: {
+        token: 'A'.repeat(43),
+        purpose: '研究生申请材料核验',
+        verifier: '目标院校招生办公室',
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.json().disclosed).toEqual({ courseName: '区块链技术与应用', grade: 'A' });
+    expect(response.body).not.toContain('92');
+    const canonical = Buffer.from(`{"purpose":"研究生申请材料核验","token":"${'A'.repeat(43)}","verifier":"目标院校招生办公室"}`);
+    expect(ledger.evaluateDisclosure).toHaveBeenCalledWith({
+      grantId: 'grant:2026:api01', privateAccess: canonical,
+    });
+    expect(ledger.consumeDisclosure).toHaveBeenCalledWith({
+      grantId: 'grant:2026:api01', privateAccess: canonical,
+    });
     await app.close();
   });
 });

@@ -491,6 +491,24 @@ body { background: var(--paper); }
 .share-copy > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
 .share-url { margin: 20px 0; padding: 13px 15px; border: 1px solid #d6d5cb; border-radius: 10px; color: #526058; background: rgba(255,255,255,.7); font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; }
 .share-actions { display: flex; gap: 10px; }
+.panel-lead { margin: -4px 0 24px; color: var(--muted); font-size: 13px; line-height: 1.8; }
+.disclosure-panel { border-color: #c8d5c9; background: linear-gradient(145deg, #fff 0%, #f7f3e8 100%); }
+.disclosure-fields { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; border: 0; }
+.disclosure-fields legend { width: 100%; margin-bottom: 8px; color: var(--ink); font-size: 12px; font-weight: 700; }
+.disclosure-fields label { display: inline-flex; flex-direction: row; gap: 8px; align-items: center; padding: 11px 14px; border: 1px solid #d6ddd3; border-radius: 999px; color: #3d4d44; background: rgba(255,255,255,.78); cursor: pointer; }
+.disclosure-fields input { width: 15px; height: 15px; margin: 0; accent-color: var(--green); }
+.disclosure-secret { grid-column: 1 / -1; display: grid; grid-template-columns: 190px 1fr; gap: 26px; align-items: center; margin-top: 26px; padding: 24px; border: 1px solid #bdcfbf; border-radius: 16px; background: #edf5eb; }
+.disclosure-secret h4, .grant-history h4, .disclosure-result h4 { margin: 8px 0; font-family: var(--display); font-size: 23px; }
+.disclosure-secret p, .disclosure-result p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.grant-history { margin-top: 28px; padding-top: 26px; border-top: 1px solid var(--line); }
+.grant-history .list-toolbar { margin-bottom: 14px; }
+.status.consumed { color: #66531c; border-color: #d8c98d; background: #f7f0d6; }
+.disclosure-consume { margin-top: 8px; }
+.disclosure-result { display: grid; grid-template-columns: minmax(220px, .8fr) 1.2fr; gap: 28px; margin-top: 26px; padding: 25px; border: 1px solid #bdd2c0; border-radius: 16px; background: #edf5eb; }
+.disclosure-result dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.disclosure-result dl div { padding: 14px; border-left: 1px solid #cad9cb; }
+.disclosure-result dt { color: var(--muted); font-size: 11px; }
+.disclosure-result dd { margin: 8px 0 0; overflow-wrap: anywhere; font-size: 18px; font-weight: 750; }
 
 .verify-panel { padding: 36px 38px; }
 .verification-result { grid-template-columns: 84px 1fr auto; padding: 36px 38px; border-radius: 20px; box-shadow: var(--shadow); }
@@ -577,6 +595,9 @@ body { background: var(--paper); }
   .credential-seal::after { right: 22px; bottom: auto; writing-mode: horizontal-tb; letter-spacing: .18em; }
   .student-card-main { padding: 26px 24px; }
   .share-card { grid-template-columns: 1fr; padding: 24px; }
+  .disclosure-secret, .disclosure-result { grid-template-columns: 1fr; }
+  .disclosure-result dl { grid-template-columns: 1fr; }
+  .disclosure-result dl div { padding: 13px 0; border-left: 0; border-top: 1px solid #cad9cb; }
   .qr-frame { width: max-content; max-width: 100%; margin-inline: auto; }
   .share-copy h3 { font-size: 24px; }
   .share-actions { align-items: stretch; flex-direction: column; }

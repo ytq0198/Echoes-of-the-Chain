@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
-  AppealStatus, CredentialStatus, LedgerPage, PublicAppealRecord, PublicCredentialRecord,
+  AppealStatus, CredentialStatus, DisclosureField, DisclosureResult, LedgerPage,
+  PublicAppealRecord, PublicCredentialRecord, PublicDisclosureGrant,
 } from '@chaingrade/shared';
 import QrcodeVue from 'qrcode.vue';
 import {
@@ -91,6 +92,21 @@ const privateDetailsMessage = ref('');
 const privateDetails = ref<Record<string, unknown>>();
 const sharePanelOpen = ref(false);
 const shareCopyMessage = ref('');
+const disclosurePanelOpen = ref(false);
+const disclosureState = ref<RequestState>('idle');
+const disclosureMessage = ref('');
+const disclosureToken = ref('');
+const createdDisclosure = ref<PublicDisclosureGrant>();
+const disclosureItems = ref<PublicDisclosureGrant[]>([]);
+const disclosureListState = ref<RequestState>('idle');
+const disclosureForm = ref({
+  grantId: 'grant:2026:share08',
+  selectedFields: ['courseName', 'grade'] as DisclosureField[],
+  purpose: '研究生申请材料核验',
+  verifier: '目标院校招生办公室',
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString().slice(0, 16),
+  maxUses: 1,
+});
 const appealState = ref<RequestState>('idle');
 const appealMessage = ref('');
 const submittedAppeal = ref<PublicAppealRecord>();
@@ -100,6 +116,10 @@ const verifyDetailHash = ref('ebc3ed396f7fba90bd55c28ed6233ac446b164bd0cade67435
 const verifyState = ref<RequestState>('idle');
 const verifyMessage = ref('');
 const verification = ref<VerificationResult>();
+const disclosureVerifyState = ref<RequestState>('idle');
+const disclosureVerifyMessage = ref('');
+const disclosureResult = ref<DisclosureResult>();
+const disclosureVerifyForm = ref({ grantId: '', token: '', purpose: '', verifier: '' });
 
 const viewLabel = computed(() => ({ home: '可信成绩工作台', issuer: '教师签发', reviewer: '独立复核', student: '学生凭证', verify: '公开验真' })[currentView.value]);
 const viewMeta = computed(() => ({
@@ -119,15 +139,34 @@ const verificationShareUrl = computed(() => {
   url.searchParams.set('detailHash', studentRecord.value.detailHash);
   return url.toString();
 });
+const disclosureShareUrl = computed(() => {
+  if (!createdDisclosure.value || !disclosureToken.value) return '';
+  const url = new URL(window.location.href);
+  url.search = '';
+  const params = new URLSearchParams({
+    grantId: createdDisclosure.value.grantId,
+    token: disclosureToken.value,
+    purpose: disclosureForm.value.purpose,
+    verifier: disclosureForm.value.verifier,
+  });
+  url.hash = `verify?${params.toString()}`;
+  return url.toString();
+});
 
 function viewFromHash(): View {
-  const candidate = window.location.hash.replace(/^#\/?/, '') as View;
+  const candidate = window.location.hash.replace(/^#\/?/, '').split('?')[0] as View;
   return views.includes(candidate) ? candidate : 'home';
 }
 function syncHash(): void { currentView.value = viewFromHash(); mobileMenuOpen.value = false; window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function openView(view: View): void { window.location.hash = `#${view}`; }
 function scrollToAppeal(): void { document.getElementById('appeal-form')?.scrollIntoView({ behavior: 'smooth' }); }
 function openSharePanel(): void { sharePanelOpen.value = true; shareCopyMessage.value = ''; }
+function openDisclosurePanel(): void {
+  disclosurePanelOpen.value = true;
+  disclosureMessage.value = '';
+  disclosureToken.value = '';
+  createdDisclosure.value = undefined;
+}
 async function copyShareLink(): Promise<void> {
   try {
     await navigator.clipboard.writeText(verificationShareUrl.value);
@@ -136,11 +175,27 @@ async function copyShareLink(): Promise<void> {
     shareCopyMessage.value = '请手动复制';
   }
 }
+async function copyDisclosureLink(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(disclosureShareUrl.value);
+    disclosureMessage.value = '授权链接已复制；令牌不会再次显示。';
+  } catch { disclosureMessage.value = '请手动复制本次授权链接。'; }
+}
 function openSharedVerification(): void {
   if (studentRecord.value) {
     verifyCredentialId.value = studentRecord.value.credentialId;
     verifyDetailHash.value = studentRecord.value.detailHash;
   }
+  openView('verify');
+}
+function openSharedDisclosure(): void {
+  if (!createdDisclosure.value) return;
+  disclosureVerifyForm.value = {
+    grantId: createdDisclosure.value.grantId,
+    token: disclosureToken.value,
+    purpose: disclosureForm.value.purpose,
+    verifier: disclosureForm.value.verifier,
+  };
   openView('verify');
 }
 function hydrateVerificationFromUrl(): void {
@@ -149,6 +204,16 @@ function hydrateVerificationFromUrl(): void {
   const detailHash = params.get('detailHash');
   if (credentialId) verifyCredentialId.value = credentialId;
   if (detailHash) verifyDetailHash.value = detailHash;
+  const fragmentQuery = window.location.hash.split('?')[1];
+  if (fragmentQuery) {
+    const disclosureParams = new URLSearchParams(fragmentQuery);
+    disclosureVerifyForm.value = {
+      grantId: disclosureParams.get('grantId') ?? '',
+      token: disclosureParams.get('token') ?? '',
+      purpose: disclosureParams.get('purpose') ?? '',
+      verifier: disclosureParams.get('verifier') ?? '',
+    };
+  }
 }
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -206,10 +271,11 @@ async function loadAppealReviewList(append = false): Promise<void> {
   } catch { appealReviewListState.value = 'error'; }
 }
 async function loadStudentLists(): Promise<void> {
-  studentListState.value = 'loading'; studentAppealListState.value = 'loading';
-  const [credentials, appeals] = await Promise.allSettled([
+  studentListState.value = 'loading'; studentAppealListState.value = 'loading'; disclosureListState.value = 'loading';
+  const [credentials, appeals, disclosures] = await Promise.allSettled([
     requestJson<LedgerPage<PublicCredentialRecord>>('/api/v1/credentials/mine?pageSize=8'),
     requestJson<LedgerPage<PublicAppealRecord>>('/api/v1/appeals/mine?pageSize=8'),
+    requestJson<LedgerPage<PublicDisclosureGrant>>('/api/v1/disclosures/mine?pageSize=8'),
   ]);
   if (credentials.status === 'fulfilled') {
     studentItems.value = credentials.value.items; studentBookmark.value = credentials.value.bookmark; studentListState.value = 'success';
@@ -217,6 +283,9 @@ async function loadStudentLists(): Promise<void> {
   if (appeals.status === 'fulfilled') {
     studentAppealItems.value = appeals.value.items; studentAppealBookmark.value = appeals.value.bookmark; studentAppealListState.value = 'success';
   } else studentAppealListState.value = 'error';
+  if (disclosures.status === 'fulfilled') {
+    disclosureItems.value = disclosures.value.items; disclosureListState.value = 'success';
+  } else disclosureListState.value = 'error';
 }
 async function loadMoreStudentCredentials(): Promise<void> {
   if (!studentBookmark.value) return;
@@ -233,7 +302,7 @@ function selectAppealReviewItem(record: PublicAppealRecord): void {
   appealReviewForm.value.appealId = record.appealId; appealReviewRecord.value = record; appealReviewMessage.value = '';
 }
 function selectStudentItem(record: PublicCredentialRecord): void {
-  studentCredentialId.value = record.credentialId; studentRecord.value = record; privateDetails.value = undefined; sharePanelOpen.value = false;
+  studentCredentialId.value = record.credentialId; studentRecord.value = record; privateDetails.value = undefined; sharePanelOpen.value = false; disclosurePanelOpen.value = false;
 }
 function refreshCurrentWorkspace(): void {
   if (!sessionMatchesView.value) return;
@@ -303,6 +372,48 @@ async function submitAppeal(): Promise<void> {
   try { submittedAppeal.value = await requestJson<PublicAppealRecord>(`/api/v1/credentials/${encodeURIComponent(credentialId)}/appeals`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ appealId: appealForm.value.appealId, details: { reason: appealForm.value.reason, salt: appealForm.value.salt } }) }); appealReviewForm.value.appealId = appealForm.value.appealId; appealState.value = 'success'; appealMessage.value = '申诉已由学生属性证书提交，理由明文未进入公共账本。'; void loadStudentLists(); }
   catch (error) { appealState.value = 'error'; appealMessage.value = error instanceof Error ? error.message : '申诉提交失败'; }
 }
+async function createDisclosure(): Promise<void> {
+  if (!studentRecord.value) return;
+  disclosureState.value = 'loading'; disclosureMessage.value = ''; disclosureToken.value = ''; createdDisclosure.value = undefined;
+  try {
+    const response = await requestJson<{ grant: PublicDisclosureGrant; token: string }>(
+      `/api/v1/credentials/${encodeURIComponent(studentRecord.value.credentialId)}/disclosures`,
+      {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...disclosureForm.value,
+          expiresAt: new Date(disclosureForm.value.expiresAt).toISOString(),
+          maxUses: Number(disclosureForm.value.maxUses),
+        }),
+      },
+    );
+    createdDisclosure.value = response.grant; disclosureToken.value = response.token;
+    disclosureState.value = 'success'; disclosureMessage.value = '授权已上链。令牌和完整链接只在本次创建后显示，请妥善转交。';
+    void loadStudentLists();
+  } catch (error) { disclosureState.value = 'error'; disclosureMessage.value = error instanceof Error ? error.message : '授权创建失败'; }
+}
+async function revokeDisclosure(grantId: string): Promise<void> {
+  disclosureState.value = 'loading'; disclosureMessage.value = '';
+  try {
+    await requestJson<PublicDisclosureGrant>(`/api/v1/disclosures/${encodeURIComponent(grantId)}/revoke`, { method: 'POST' });
+    disclosureState.value = 'success'; disclosureMessage.value = '披露授权已撤销，原链接立即失效。';
+    void loadStudentLists();
+  } catch (error) { disclosureState.value = 'error'; disclosureMessage.value = error instanceof Error ? error.message : '授权撤销失败'; }
+}
+async function consumeDisclosure(): Promise<void> {
+  disclosureVerifyState.value = 'loading'; disclosureVerifyMessage.value = ''; disclosureResult.value = undefined;
+  try {
+    disclosureResult.value = await requestJson<DisclosureResult>(
+      `/api/v1/disclosures/${encodeURIComponent(disclosureVerifyForm.value.grantId)}/consume`,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+        token: disclosureVerifyForm.value.token,
+        purpose: disclosureVerifyForm.value.purpose,
+        verifier: disclosureVerifyForm.value.verifier,
+      }) },
+    );
+    disclosureVerifyState.value = 'success'; disclosureVerifyMessage.value = '授权校验与链上消费成功，仅返回学生允许披露的字段。';
+  } catch (error) { disclosureVerifyState.value = 'error'; disclosureVerifyMessage.value = error instanceof Error ? error.message : '授权核验失败'; }
+}
 async function verifyCredential(): Promise<void> {
   verifyState.value = 'loading'; verifyMessage.value = ''; verification.value = undefined;
   try { const query = verifyDetailHash.value ? `?detailHash=${encodeURIComponent(verifyDetailHash.value)}` : ''; verification.value = await requestJson<VerificationResult>(`/api/v1/credentials/${encodeURIComponent(verifyCredentialId.value)}/verify${query}`); verifyState.value = 'success'; }
@@ -332,7 +443,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
           <div class="side-group"><p>工作台</p><a class="active" href="#home"><PhFileText :size="20" />可信成绩工作台</a></div>
           <div class="side-group"><p>工作流程</p><a href="#issuer"><PhGraduationCap :size="20" />教师签发</a><a href="#reviewer"><PhShieldCheck :size="20" />独立复核</a><a href="#student"><PhStudent :size="20" />学生凭证</a><a href="#verify"><PhMagnifyingGlass :size="20" />公开验真</a></div>
           <div class="side-group"><p>信任与规则</p><a href="#home"><PhBookOpenText :size="20" />机制说明</a><a href="#home"><PhUsersThree :size="20" />节点与机构</a><a href="#home"><PhLockKey :size="20" />隐私与公开</a></div>
-          <dl class="ledger-status"><div><dt>账本状态</dt><dd><span></span>正常</dd></div><div><dt>网络</dt><dd>Fabric 2.5 LTS</dd></div><div><dt>通道</dt><dd class="mono">chaingrade</dd></div><div><dt>链码</dt><dd class="mono">grade 0.4</dd></div><div><dt>区块高度</dt><dd>23</dd></div><div><dt>节点</dt><dd>Org1 / Org2</dd></div></dl>
+          <dl class="ledger-status"><div><dt>账本状态</dt><dd><span></span>正常</dd></div><div><dt>网络</dt><dd>Fabric 2.5 LTS</dd></div><div><dt>通道</dt><dd class="mono">chaingrade</dd></div><div><dt>链码</dt><dd class="mono">grade 0.8</dd></div><div><dt>授权模型</dt><dd>限时 / 限次</dd></div><div><dt>节点</dt><dd>Org1 / Org2</dd></div></dl>
         </aside>
 
         <section class="dashboard-main">
@@ -404,8 +515,9 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
         <section class="ledger-list-panel student-vault"><div class="list-toolbar"><div><p class="eyebrow">MY CREDENTIALS</p><h3>由学生证书解锁的凭证</h3></div><span class="subject-bound"><PhLockKey :size="16" weight="fill" /> SUBJECT BOUND</span></div><div v-if="studentItems.length" class="ledger-list credential-grid"><article v-for="record in studentItems" :key="record.credentialId" :class="{ selected: studentRecord?.credentialId === record.credentialId }"><div><span class="status" :class="record.status.toLowerCase()">{{ record.status }}</span><b>{{ record.credentialId }}</b></div><span>版本 v{{ record.version }} · {{ formatTime(record.updatedAt) }}</span><button type="button" class="text-button" @click="selectStudentItem(record)">打开凭证 →</button></article></div><div v-else class="list-empty"><PhCertificate :size="27" weight="duotone" /><span>{{ studentListState === 'loading' ? '正在校验证书属性并读取索引…' : '当前学生身份下暂无凭证' }}</span></div><button v-if="studentBookmark" type="button" class="button secondary list-more" @click="loadMoreStudentCredentials">载入更多本人凭证</button></section>
         <div class="lookup-panel"><label for="student-id">凭证标识</label><div class="lookup-row"><input id="student-id" v-model="studentCredentialId" /><button class="button secondary" :disabled="studentState === 'loading'" @click="loadStudentCredential">打开凭证</button></div><p v-if="studentMessage" class="notice" :class="studentState">{{ studentMessage }}</p></div>
         <article v-if="!studentRecord" class="empty-guidance student-guidance"><PhStudent :size="34" weight="duotone" /><div><span>YOUR CREDENTIAL SPACE</span><h3>凭证在这里成为学生可理解的证据</h3><p>打开凭证后可查看有效状态、请求本人私有成绩，或针对当前有效版本发起轻量申诉。</p></div><ol><li>打开本人凭证</li><li>按需披露成绩</li><li>提交私有申诉</li></ol></article>
-        <article v-if="studentRecord" class="student-card"><div class="credential-seal">CG</div><div class="student-card-main"><p>ACADEMIC CREDENTIAL · v{{ studentRecord.version }}</p><h3>{{ studentRecord.credentialId }}</h3><span class="status" :class="studentRecord.status.toLowerCase()">{{ studentRecord.status }}</span><dl><div><dt>签发组织</dt><dd>{{ studentRecord.issuerMspId }}</dd></div><div><dt>最近更新</dt><dd>{{ formatTime(studentRecord.updatedAt) }}</dd></div><div><dt>成绩详情</dt><dd>{{ privateDetails ? '本人授权已读取' : '仅授权后披露' }}</dd></div></dl><div class="student-actions"><button class="button secondary" :disabled="studentRecord.status !== 'ACTIVE'" @click="scrollToAppeal">发起成绩申诉</button><button class="button secondary" :disabled="privateDetailsState === 'loading'" @click="loadPrivateDetails">{{ privateDetailsState === 'loading' ? '正在验证证书…' : '授权读取成绩' }}</button><button class="button primary" @click="openSharePanel">生成验真入口</button></div></div></article>
+        <article v-if="studentRecord" class="student-card"><div class="credential-seal">CG</div><div class="student-card-main"><p>ACADEMIC CREDENTIAL · v{{ studentRecord.version }}</p><h3>{{ studentRecord.credentialId }}</h3><span class="status" :class="studentRecord.status.toLowerCase()">{{ studentRecord.status }}</span><dl><div><dt>签发组织</dt><dd>{{ studentRecord.issuerMspId }}</dd></div><div><dt>最近更新</dt><dd>{{ formatTime(studentRecord.updatedAt) }}</dd></div><div><dt>成绩详情</dt><dd>{{ privateDetails ? '本人授权已读取' : '仅授权后披露' }}</dd></div></dl><div class="student-actions"><button class="button secondary" :disabled="studentRecord.status !== 'ACTIVE'" @click="scrollToAppeal">发起成绩申诉</button><button class="button secondary" :disabled="privateDetailsState === 'loading'" @click="loadPrivateDetails">{{ privateDetailsState === 'loading' ? '正在验证证书…' : '授权读取成绩' }}</button><button class="button secondary" @click="openSharePanel">公共验真入口</button><button class="button primary" :disabled="studentRecord.status !== 'ACTIVE'" @click="openDisclosurePanel">创建披露授权</button></div></div></article>
         <article v-if="sharePanelOpen && studentRecord" class="share-card"><div class="qr-frame"><QrcodeVue :value="verificationShareUrl" :size="184" level="M" render-as="svg" /></div><div class="share-copy"><p class="eyebrow">SHAREABLE VERIFICATION</p><h3>让核验者扫码查看链上结论</h3><p>二维码只携带凭证标识与详情哈希，不包含成绩、盐值或学生身份信息。持有者可自主决定是否分享。</p><div class="share-url mono">{{ verificationShareUrl }}</div><div class="share-actions"><button class="button secondary" type="button" @click="copyShareLink">{{ shareCopyMessage || '复制验真链接' }}</button><button class="button primary" type="button" @click="openSharedVerification">预览验真结果</button></div></div></article>
+        <section v-if="disclosurePanelOpen && studentRecord" class="operation-panel disclosure-panel"><div class="operation-heading"><div><p class="eyebrow">BOUNDED DISCLOSURE</p><h3>创建限时披露授权</h3></div><span>令牌仅显示一次</span></div><p class="panel-lead">选择最少必要字段，并把授权绑定到明确用途、验证者、期限和使用次数。公共账本只记录这些内容的哈希承诺。</p><form class="compact-form" @submit.prevent="createDisclosure"><div class="field wide"><label for="grant-id">授权标识</label><input id="grant-id" v-model="disclosureForm.grantId" required /></div><fieldset class="field wide disclosure-fields"><legend>允许披露的字段</legend><label><input v-model="disclosureForm.selectedFields" type="checkbox" value="courseName" />课程名称</label><label><input v-model="disclosureForm.selectedFields" type="checkbox" value="score" />成绩分数</label><label><input v-model="disclosureForm.selectedFields" type="checkbox" value="grade" />成绩等级</label></fieldset><div class="field"><label for="disclosure-purpose">授权用途</label><input id="disclosure-purpose" v-model="disclosureForm.purpose" minlength="4" maxlength="200" required /></div><div class="field"><label for="disclosure-verifier">指定验证者</label><input id="disclosure-verifier" v-model="disclosureForm.verifier" minlength="4" maxlength="200" required /></div><div class="field"><label for="disclosure-expiry">有效期至</label><input id="disclosure-expiry" v-model="disclosureForm.expiresAt" type="datetime-local" required /></div><div class="field"><label for="disclosure-uses">最大使用次数</label><input id="disclosure-uses" v-model.number="disclosureForm.maxUses" type="number" min="1" max="10" required /></div><button class="button primary" :disabled="disclosureState === 'loading' || disclosureForm.selectedFields.length === 0">{{ disclosureState === 'loading' ? '正在写入授权…' : '生成限时授权' }}</button><p v-if="disclosureMessage" class="notice" :class="disclosureState">{{ disclosureMessage }}</p></form><article v-if="createdDisclosure && disclosureToken" class="disclosure-secret"><div class="qr-frame"><QrcodeVue :value="disclosureShareUrl" :size="164" level="M" render-as="svg" /></div><div><span class="status" :class="createdDisclosure.status.toLowerCase()">{{ createdDisclosure.status }}</span><h4>一次性授权链接已生成</h4><p>此链接包含 bearer token。离开页面后系统无法恢复明文令牌。</p><div class="share-url mono">{{ disclosureShareUrl }}</div><div class="share-actions"><button class="button secondary" type="button" @click="copyDisclosureLink">复制授权链接</button><button class="button primary" type="button" @click="openSharedDisclosure">预览最小披露</button></div></div></article><div class="grant-history"><div class="list-toolbar"><div><p class="eyebrow">AUTHORIZATION HISTORY</p><h4>本人授权记录</h4></div><span>{{ disclosureItems.length }} 项</span></div><div v-if="disclosureItems.length" class="ledger-list compact"><article v-for="grant in disclosureItems" :key="grant.grantId"><div><span class="status" :class="grant.status.toLowerCase()">{{ grant.status }}</span><b>{{ grant.grantId }}</b></div><span>{{ grant.selectedFields.join(' · ') }} · {{ grant.usedCount }}/{{ grant.maxUses }} 次</span><button v-if="grant.status === 'ACTIVE'" class="text-button" type="button" @click="revokeDisclosure(grant.grantId)">撤销授权 →</button><time v-else>{{ formatTime(grant.updatedAt) }}</time></article></div><div v-else class="list-empty small"><span>{{ disclosureListState === 'loading' ? '正在读取授权索引…' : '尚未创建披露授权' }}</span></div></div></section>
         <article v-if="privateDetails || privateDetailsMessage" class="private-details-card"><div class="operation-heading"><div><p class="eyebrow">SUBJECT-BOUND DISCLOSURE</p><h3>仅向本人披露的成绩详情</h3></div><span>Cache-Control: no-store</span></div><p v-if="privateDetailsMessage" class="notice" :class="privateDetailsState">{{ privateDetailsMessage }}</p><dl v-if="privateDetails"><div v-for="(value, key) in privateDetails" :key="key"><dt>{{ key }}</dt><dd :class="{ mono: key === 'salt' }">{{ key === 'salt' ? '••••••••（不展示）' : value }}</dd></div></dl></article>
         <section id="appeal-form" class="operation-panel"><div class="operation-heading"><div><p class="eyebrow">PRIVATE APPEAL</p><h3>提交轻量成绩申诉</h3></div><span>学生属性证书约束本人凭证</span></div><div v-if="studentAppealItems.length" class="my-appeals"><p>我的申诉进度</p><article v-for="appeal in studentAppealItems" :key="appeal.appealId"><span class="status" :class="appeal.status.toLowerCase()">{{ appeal.status }}</span><b>{{ appeal.appealId }}</b><span>{{ appeal.credentialId }}</span><time>{{ formatTime(appeal.updatedAt) }}</time></article></div><div v-else-if="studentAppealListState !== 'loading'" class="list-empty small"><span>尚未提交成绩申诉</span></div><form class="compact-form" @submit.prevent="submitAppeal"><div class="field"><label for="appeal-id">申诉标识</label><input id="appeal-id" v-model="appealForm.appealId" required /></div><div class="field"><label>关联凭证</label><input :value="studentRecord?.credentialId ?? studentCredentialId" disabled /></div><div class="field wide"><label for="appeal-reason">申诉理由</label><textarea id="appeal-reason" v-model="appealForm.reason" minlength="10" maxlength="2000" required></textarea></div><div class="field wide"><label for="appeal-salt">申诉隐私盐值</label><input id="appeal-salt" v-model="appealForm.salt" class="mono" minlength="16" required /></div><button class="button primary" :disabled="appealState === 'loading' || studentRecord?.status !== 'ACTIVE'">{{ appealState === 'loading' ? '正在提交…' : '由学生证书提交申诉' }}</button><p v-if="appealMessage" class="notice" :class="appealState">{{ appealMessage }}</p></form><article v-if="submittedAppeal" class="mini-result"><span class="status open">{{ submittedAppeal.status }}</span><b>{{ submittedAppeal.appealId }}</b><span class="mono">reason {{ shortHash(submittedAppeal.reasonHash) }}</span></article></section>
         </div>
@@ -416,10 +528,11 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
         <form class="verify-panel" @submit.prevent="verifyCredential"><div class="field"><label for="verify-id">凭证标识</label><input id="verify-id" v-model="verifyCredentialId" required /></div><div class="field"><label for="detail-hash">详情哈希（可选）</label><input id="detail-hash" v-model="verifyDetailHash" class="mono" placeholder="64 位 SHA-256" /></div><button class="button primary" :disabled="verifyState === 'loading'">{{ verifyState === 'loading' ? '正在访问账本…' : '开始验真' }}</button><p v-if="verifyMessage" class="notice" :class="verifyState">{{ verifyMessage }}</p></form>
         <article v-if="!verification" class="empty-guidance verify-guidance"><PhMagnifyingGlass :size="34" weight="duotone" /><div><span>PUBLIC VERIFICATION</span><h3>验证只回答“真不真”与“是否有效”</h3><p>详情哈希用于比对持有者主动提供的信息；留空时仍可查询凭证的公开状态与签发来源。</p></div><ol><li>提供凭证标识</li><li>可选比对哈希</li><li>读取链上结论</li></ol></article>
         <article v-if="verification" class="verification-result" :class="{ authentic: verification.authentic && verification.valid, invalid: !verification.authentic || !verification.valid }"><div class="verification-icon">{{ verification.authentic && verification.valid ? '✓' : '!' }}</div><div><p>{{ verification.authentic && verification.valid ? 'VERIFIED ON CHAIN' : 'VERIFICATION WARNING' }}</p><h3>{{ verification.authentic && verification.valid ? '凭证真实且当前有效' : '凭证未通过完整验证' }}</h3><span>{{ verification.authentic ? '哈希匹配' : '哈希不匹配' }} · {{ verification.valid ? '状态有效' : `状态 ${verification.status}` }}</span></div><dl><div><dt>签发组织</dt><dd>{{ verification.issuerMspId }}</dd></div><div><dt>当前版本</dt><dd>v{{ verification.version }}</dd></div><div><dt>审计交易</dt><dd class="mono">{{ shortHash(verification.transactionId) }}</dd></div></dl></article>
+        <section class="operation-panel disclosure-consume"><div class="operation-heading"><div><p class="eyebrow">AUTHORIZED DISCLOSURE</p><h3>核验学生授权的最小字段</h3></div><span>每次成功核验都会链上计数</span></div><p class="panel-lead">授权链接会自动填入下列绑定信息。令牌、用途或验证者任一不匹配，链码都会拒绝披露。</p><form class="compact-form" @submit.prevent="consumeDisclosure"><div class="field"><label for="consume-grant">授权标识</label><input id="consume-grant" v-model="disclosureVerifyForm.grantId" required /></div><div class="field"><label for="consume-token">授权令牌</label><input id="consume-token" v-model="disclosureVerifyForm.token" type="password" autocomplete="off" class="mono" minlength="43" maxlength="43" required /></div><div class="field"><label for="consume-purpose">声明用途</label><input id="consume-purpose" v-model="disclosureVerifyForm.purpose" required /></div><div class="field"><label for="consume-verifier">验证者</label><input id="consume-verifier" v-model="disclosureVerifyForm.verifier" required /></div><button class="button primary" :disabled="disclosureVerifyState === 'loading'">{{ disclosureVerifyState === 'loading' ? '正在校验并消费…' : '读取授权字段' }}</button><p v-if="disclosureVerifyMessage" class="notice" :class="disclosureVerifyState">{{ disclosureVerifyMessage }}</p></form><article v-if="disclosureResult" class="disclosure-result"><div><span class="status" :class="disclosureResult.grant.status.toLowerCase()">{{ disclosureResult.grant.status }}</span><h4>授权字段已由链码验证</h4><p>{{ disclosureResult.grant.usedCount }}/{{ disclosureResult.grant.maxUses }} 次 · 有效期至 {{ formatTime(disclosureResult.grant.expiresAt) }}</p></div><dl><div v-for="(value, key) in disclosureResult.disclosed" :key="key"><dt>{{ key }}</dt><dd>{{ value }}</dd></div></dl></article></section>
         </div>
       </section>
       <aside class="principle-strip"><div class="shell"><PhLockKey :size="20" weight="duotone" /><p><b>最小披露原则</b><span>公共账本只承载验证所需的状态、承诺与审计字段，成绩与申诉正文始终留在授权边界内。</span></p><a href="#home">查看证据链全貌<PhArrowRight :size="16" /></a></div></aside>
     </template>
-    <footer class="footer"><div class="brand"><span class="brand-mark"><PhShieldCheck :size="17" weight="fill" /></span><span>ChainGrade</span></div><p>Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.7 <span>·</span> 私有复核决定</p><a href="#home">返回工作台</a></footer>
+    <footer class="footer"><div class="brand"><span class="brand-mark"><PhShieldCheck :size="17" weight="fill" /></span><span>ChainGrade</span></div><p>Fabric 2.5 LTS <span>·</span> chaingrade <span>·</span> grade 0.8 <span>·</span> 限时最小披露</p><a href="#home">返回工作台</a></footer>
   </main>
 </template>

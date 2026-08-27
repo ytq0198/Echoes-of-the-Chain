@@ -452,4 +452,105 @@ describe('GradeContract', () => {
     expect(queue.items[0]).toMatchObject({ appealId: 'appeal:2026:list01', issuerMspId: 'UniversityAMSP' });
     expect(mine.items).toHaveLength(1);
   });
+
+  it('creates, consumes and exhausts a subject-bound disclosure grant', async () => {
+    await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:share01'));
+    await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:share01');
+    const student = {
+      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+    } as const;
+    const access = {
+      token: 'A'.repeat(43),
+      purpose: 'graduate application verification',
+      verifier: 'target university admissions office',
+    };
+    const grantInput = JSON.stringify({
+      grantId: 'grant:2026:share01',
+      credentialId: 'cred:2026:share01',
+      tokenHash: sha256(access.token),
+      purposeHash: sha256(access.purpose),
+      verifierHash: sha256(access.verifier),
+      selectedFields: ['courseName', 'grade'],
+      expiresAt: '2026-08-25T16:00:00.000Z',
+      maxUses: 2,
+    });
+    const created = JSON.parse(
+      await contract.CreateDisclosureGrant(context(ledger, student), grantInput),
+    ) as { status: string; usedCount: number; tokenHash: string };
+    expect(created).toMatchObject({ status: 'ACTIVE', usedCount: 0, tokenHash: sha256(access.token) });
+    expect(JSON.stringify(created)).not.toContain(access.purpose);
+    expect(JSON.stringify(created)).not.toContain(access.verifier);
+
+    ledger.transient.set('disclosureAccess', Buffer.from(JSON.stringify(access)));
+    const disclosed = JSON.parse(
+      await contract.EvaluateDisclosureGrant(context(ledger, reviewer), 'grant:2026:share01'),
+    ) as Record<string, unknown>;
+    expect(disclosed).toEqual({ grade: 'A' });
+    expect(disclosed).not.toHaveProperty('score');
+    expect(disclosed).not.toHaveProperty('salt');
+    const first = JSON.parse(
+      await contract.ConsumeDisclosureGrant(context(ledger, reviewer), 'grant:2026:share01'),
+    ) as { status: string; usedCount: number };
+    expect(first).toMatchObject({ status: 'ACTIVE', usedCount: 1 });
+    const second = JSON.parse(
+      await contract.ConsumeDisclosureGrant(context(ledger, reviewer), 'grant:2026:share01'),
+    ) as { status: string; usedCount: number };
+    expect(second).toMatchObject({ status: 'CONSUMED', usedCount: 2 });
+    await expect(
+      contract.ConsumeDisclosureGrant(context(ledger, reviewer), 'grant:2026:share01'),
+    ).rejects.toThrow('active disclosure');
+
+    const mine = JSON.parse(
+      await contract.ListMyDisclosureGrants(context(ledger, student), '10', ''),
+    ) as { items: Array<{ grantId: string }> };
+    expect(mine.items.map((grant) => grant.grantId)).toContain('grant:2026:share01');
+  });
+
+  it('rejects mismatched disclosure bindings and supports student revocation', async () => {
+    await contract.CreateCredentialDraft(context(ledger, issuer), draft('cred:2026:share02'));
+    await contract.ApproveCredential(context(ledger, reviewer), 'cred:2026:share02');
+    const student = {
+      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+    } as const;
+    const token = 'B'.repeat(43);
+    await contract.CreateDisclosureGrant(context(ledger, student), JSON.stringify({
+      grantId: 'grant:2026:share02', credentialId: 'cred:2026:share02',
+      tokenHash: sha256(token), purposeHash: sha256('scholarship verification'),
+      verifierHash: sha256('scholarship committee'), selectedFields: ['score'],
+      expiresAt: '2026-08-25T16:00:00.000Z', maxUses: 1,
+    }));
+    ledger.transient.set('disclosureAccess', Buffer.from(JSON.stringify({
+      token, purpose: 'scholarship verification', verifier: 'wrong verifier',
+    })));
+    await expect(
+      contract.ConsumeDisclosureGrant(context(ledger, reviewer), 'grant:2026:share02'),
+    ).rejects.toThrow('binding');
+    const revoked = JSON.parse(
+      await contract.RevokeDisclosureGrant(context(ledger, student), 'grant:2026:share02'),
+    ) as { status: string };
+    expect(revoked.status).toBe('REVOKED');
+  });
+
+  it('enforces disclosure field, usage and expiry bounds inside chaincode', async () => {
+    const student = {
+      id: 'x509::student-alice', mspId: 'UniversityAMSP', role: 'student', subjectHash,
+    } as const;
+    const base = {
+      grantId: 'grant:2026:bounds01', credentialId: 'cred:2026:missing',
+      tokenHash: sha256('token'), purposeHash: sha256('purpose'), verifierHash: sha256('verifier'),
+      selectedFields: ['grade'], expiresAt: '2026-08-25T16:00:00.000Z', maxUses: 1,
+    };
+    await expect(contract.CreateDisclosureGrant(
+      context(ledger, student), JSON.stringify({ ...base, selectedFields: ['salt'] }),
+    )).rejects.toThrow('unsupported');
+    await expect(contract.CreateDisclosureGrant(
+      context(ledger, student), JSON.stringify({ ...base, maxUses: 11 }),
+    )).rejects.toThrow('1 to 10');
+    await expect(contract.CreateDisclosureGrant(
+      context(ledger, student), JSON.stringify({ ...base, expiresAt: '2026-08-24T15:00:00.000Z' }),
+    )).rejects.toThrow('future');
+    await expect(contract.CreateDisclosureGrant(
+      context(ledger, student), JSON.stringify({ ...base, expiresAt: '2026-10-24T16:00:00.000Z' }),
+    )).rejects.toThrow('30 days');
+  });
 });

@@ -12,6 +12,14 @@ export const appealStatuses = ['OPEN', 'RESOLVED_ACCEPTED', 'RESOLVED_REJECTED']
 
 export type AppealStatus = (typeof appealStatuses)[number];
 
+export const disclosureStatuses = ['ACTIVE', 'CONSUMED', 'REVOKED'] as const;
+
+export type DisclosureStatus = (typeof disclosureStatuses)[number];
+
+export const disclosureFields = ['courseName', 'score', 'grade'] as const;
+
+export type DisclosureField = (typeof disclosureFields)[number];
+
 export interface LedgerPage<T> {
   items: T[];
   bookmark: string;
@@ -51,4 +59,30 @@ export interface PublicAppealRecord {
   reviewedByIdentityHash?: string;
   resolutionHash?: string;
   transactionId: string;
+}
+
+export interface PublicDisclosureGrant {
+  docType: 'gradeDisclosureGrant';
+  grantId: string;
+  credentialId: string;
+  subjectHash: string;
+  issuerMspId: string;
+  tokenHash: string;
+  purposeHash: string;
+  verifierHash: string;
+  selectedFields: DisclosureField[];
+  expiresAt: string;
+  maxUses: number;
+  usedCount: number;
+  status: DisclosureStatus;
+  createdByIdentityHash: string;
+  lastConsumedByIdentityHash?: string;
+  createdAt: string;
+  updatedAt: string;
+  transactionId: string;
+}
+
+export interface DisclosureResult {
+  grant: PublicDisclosureGrant;
+  disclosed: Partial<Record<DisclosureField, unknown>>;
 }

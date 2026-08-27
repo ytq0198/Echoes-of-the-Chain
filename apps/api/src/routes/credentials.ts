@@ -1,8 +1,10 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import {
   createAmendmentRequestSchema,
   createCredentialRequestSchema,
+  createDisclosureRequestSchema,
+  consumeDisclosureRequestSchema,
   credentialListQuerySchema,
   credentialDecisionRequestSchema,
   identifierSchema,
@@ -21,6 +23,7 @@ interface RouteOptions {
 }
 
 const credentialParamsSchema = z.object({ credentialId: identifierSchema });
+const disclosureParamsSchema = z.object({ grantId: identifierSchema });
 
 export async function registerCredentialRoutes(
   app: FastifyInstance,
@@ -130,4 +133,56 @@ export async function registerCredentialRoutes(
     const query = z.object({ detailHash: sha256Schema.optional() }).parse(request.query);
     return reply.send(await options.ledger.verify(credentialId, query.detailHash));
   });
+
+  app.post('/api/v1/credentials/:credentialId/disclosures', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'student', { csrf: true });
+    const { credentialId } = credentialParamsSchema.parse(request.params);
+    const input = createDisclosureRequestSchema.parse(request.body);
+    const token = randomBytes(32).toString('base64url');
+    const grant = await options.ledger.createDisclosure({
+      grantId: input.grantId,
+      credentialId,
+      tokenHash: hashText(token),
+      purposeHash: hashText(input.purpose),
+      verifierHash: hashText(input.verifier),
+      selectedFields: input.selectedFields,
+      expiresAt: new Date(input.expiresAt).toISOString(),
+      maxUses: input.maxUses,
+    });
+    reply.header('cache-control', 'no-store');
+    return reply.code(201).send({ grant, token });
+  });
+
+  app.get('/api/v1/disclosures/mine', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'student');
+    const query = credentialListQuerySchema.omit({ status: true }).parse(request.query);
+    return reply.send(await options.ledger.listMyDisclosures(query.pageSize, query.bookmark));
+  });
+
+  app.post('/api/v1/disclosures/:grantId/revoke', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'student', { csrf: true });
+    const { grantId } = disclosureParamsSchema.parse(request.params);
+    return reply.send(await options.ledger.revokeDisclosure(grantId));
+  });
+
+  app.post('/api/v1/disclosures/:grantId/consume', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    const { grantId } = disclosureParamsSchema.parse(request.params);
+    const input = consumeDisclosureRequestSchema.parse(request.body);
+    const command = {
+      grantId,
+      privateAccess: Buffer.from(canonicalJson(input)),
+    };
+    const disclosed = await options.ledger.evaluateDisclosure(command);
+    const grant = await options.ledger.consumeDisclosure(command);
+    reply.header('cache-control', 'no-store');
+    return reply.send({ grant, disclosed });
+  });
+}
+
+function hashText(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
 }

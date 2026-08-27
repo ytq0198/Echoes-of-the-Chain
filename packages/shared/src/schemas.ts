@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { disclosureFields } from './types.js';
+
 export const identifierSchema = z
   .string()
   .min(8)
@@ -73,6 +75,24 @@ export const reviewAppealRequestSchema = z.object({
 export const credentialDecisionRequestSchema = z.object({
   reason: z.string().trim().min(10).max(2_000),
   salt: z.string().min(16).max(256),
+});
+
+const disclosureFieldSchema = z.enum(disclosureFields);
+
+export const createDisclosureRequestSchema = z.object({
+  grantId: identifierSchema,
+  selectedFields: z.array(disclosureFieldSchema).min(1).max(disclosureFields.length)
+    .refine((fields) => new Set(fields).size === fields.length, 'selected fields must be unique'),
+  purpose: z.string().trim().min(4).max(200),
+  verifier: z.string().trim().min(4).max(200),
+  expiresAt: z.iso.datetime({ offset: true }),
+  maxUses: z.coerce.number().int().min(1).max(10),
+});
+
+export const consumeDisclosureRequestSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'token must be a 32-byte base64url value'),
+  purpose: z.string().trim().min(4).max(200),
+  verifier: z.string().trim().min(4).max(200),
 });
 
 export const ledgerPageQuerySchema = z.object({

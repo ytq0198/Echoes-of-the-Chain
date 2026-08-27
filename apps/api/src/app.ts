@@ -32,7 +32,7 @@ export function buildApp(options: AppOptions = {}) {
   app.get('/api/v1/meta', async () => ({
     product: 'ChainGrade',
     repository: 'Echoes-of-the-Chain',
-    phase: 'iteration-1',
+    phase: 'iteration-8',
     capabilities: [
       'credential-draft',
       'independent-review',
@@ -40,6 +40,7 @@ export function buildApp(options: AppOptions = {}) {
       'revocation',
       'appeal',
       'fabric-gateway',
+      'bounded-disclosure',
     ],
   }));
 
