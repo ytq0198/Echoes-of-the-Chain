@@ -39,6 +39,10 @@ is_running() {
 }
 
 prepare_channel_block() {
+  if [[ -s "${CHANNEL_ROOT}/${CHANNEL_NAME}.block" ]]; then
+    echo "Reusing stable native channel block"
+    return
+  fi
   mkdir -p "${GENERATED_CONFIG}"
   ln -sfn "${ORGANIZATIONS}" "${RUNTIME_ROOT}/organizations"
   sed -e 's/Host: orderer\.example\.com/Host: localhost/' \
@@ -210,8 +214,20 @@ case "${1:-}" in
     stop_process peer0.org1
     stop_process orderer
     ;;
+  reset)
+    stop_process peer0.org2
+    stop_process peer0.org1
+    stop_process orderer
+    runtime_real="$(readlink -f "${RUNTIME_ROOT}")"
+    [[ "${runtime_real}" == "${PROJECT_ROOT}/.runtime/native-fabric" ]] || {
+      echo "Refusing to reset unexpected runtime path: ${runtime_real}" >&2
+      exit 1
+    }
+    rm -rf -- "${RUNTIME_ROOT}"
+    echo "Removed disposable native runtime ${RUNTIME_ROOT}"
+    ;;
   logs)
     tail -n 80 "${LOG_ROOT}"/*.log
     ;;
-  *) echo "Usage: $0 {up|status|down|logs}" >&2; exit 2 ;;
+  *) echo "Usage: $0 {up|status|down|reset|logs}" >&2; exit 2 ;;
 esac

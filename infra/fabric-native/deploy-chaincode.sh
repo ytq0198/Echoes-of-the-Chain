@@ -47,8 +47,10 @@ package_chaincode() {
   printf '%s\n' \
     "{\"type\":\"ccaas\",\"label\":\"${CHAINCODE_LABEL}\"}" \
     >"${PACKAGE_ROOT}/outer/metadata.json"
-  tar -C "${PACKAGE_ROOT}/source" -czf "${PACKAGE_ROOT}/outer/code.tar.gz" connection.json
-  tar -C "${PACKAGE_ROOT}/outer" -czf "${PACKAGE_FILE}" metadata.json code.tar.gz
+  tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+    -C "${PACKAGE_ROOT}/source" -czf "${PACKAGE_ROOT}/outer/code.tar.gz" connection.json
+  tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+    -C "${PACKAGE_ROOT}/outer" -czf "${PACKAGE_FILE}" metadata.json code.tar.gz
 }
 
 install_for_org() {
@@ -64,8 +66,21 @@ install_for_org() {
 start_server() {
   local pid_file="${PID_ROOT}/grade-chaincode.pid"
   if [[ -s "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" 2>/dev/null; then
-    echo "grade chaincode server is already running"
-    return
+    local running_pid
+    running_pid="$(cat "${pid_file}")"
+    if tr '\0' ' ' <"/proc/${running_pid}/cmdline" | grep -Fq -- "${PACKAGE_ID}"; then
+      echo "grade chaincode server is already running with current package ID"
+      return
+    fi
+    kill "${running_pid}"
+    for _ in $(seq 1 30); do
+      kill -0 "${running_pid}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -0 "${running_pid}" 2>/dev/null && {
+      echo "old chaincode server did not stop" >&2
+      return 1
+    }
   fi
   (
     export PATH="${NODE_ROOT}:${PATH}"
