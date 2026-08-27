@@ -22,7 +22,7 @@ wait_port() {
   local port="$1"
   local name="$2"
   for _ in $(seq 1 60); do
-    if (echo >/dev/tcp/127.0.0.1/"${port}") >/dev/null 2>&1; then
+    if ss -ltnH "sport = :${port}" | grep -q .; then
       echo "${name} is listening on ${port}"
       return 0
     fi

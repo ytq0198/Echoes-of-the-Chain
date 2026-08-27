@@ -76,8 +76,8 @@ start_server() {
       >"${LOG_ROOT}/grade-chaincode.log" 2>&1 &
     echo $! >"${pid_file}"
   )
-  for _ in $(seq 1 60); do
-    if (echo >/dev/tcp/127.0.0.1/9999) >/dev/null 2>&1; then
+  for _ in $(seq 1 180); do
+    if ss -ltnH 'sport = :9999' | grep -q .; then
       echo "grade chaincode server is listening on 9999"
       return
     fi
