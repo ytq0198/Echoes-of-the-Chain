@@ -59,7 +59,14 @@ FABRIC_ENABLED=true CHAINGRADE_PROJECT_ROOT="$PWD" pnpm dev:api
 
 启用受控演示认证时，复制 [`.env.example`](.env.example) 的变量到私有 shell 环境，替换所有密码和会话密钥，并设置 `AUTH_ENABLED=true`。正式 HTTPS 部署必须同时设置 `AUTH_SECURE_COOKIE=true`；仓库不会自动加载或保存真实 `.env` 文件。
 
-启动前端与 API（Vite 会把 `/api` 代理至本机 3000 端口）：
+没有可用 Fabric 网络时，可启动明确标注的进程内演示账本。该模式用于离线演示和 UI 验收，不生成 Fabric 交易证据，也不会在界面中冒充真实链上连接：
+
+```bash
+DEMO_ENABLED=true pnpm dev:api
+pnpm dev:web
+```
+
+启动普通前端与 API（未设置 `FABRIC_ENABLED` 或 `DEMO_ENABLED` 时，业务 API 会返回不可用；Vite 会把 `/api` 代理至本机 3000 端口）：
 
 ```bash
 pnpm dev:web

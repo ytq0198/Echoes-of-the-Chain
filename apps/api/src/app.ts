@@ -10,6 +10,7 @@ import { registerCredentialRoutes } from './routes/credentials.js';
 
 interface AppOptions {
   ledger?: CredentialLedger;
+  ledgerMode?: 'fabric' | 'demo' | 'unavailable';
   sessions?: SessionService;
 }
 
@@ -33,6 +34,7 @@ export function buildApp(options: AppOptions = {}) {
     product: 'ChainGrade',
     repository: 'Echoes-of-the-Chain',
     phase: 'iteration-8',
+    ledgerMode: options.ledgerMode ?? (options.ledger ? 'demo' : 'unavailable'),
     capabilities: [
       'credential-draft',
       'independent-review',

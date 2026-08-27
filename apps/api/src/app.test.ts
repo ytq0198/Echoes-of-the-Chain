@@ -24,5 +24,6 @@ describe('API bootstrap', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().product).toBe('ChainGrade');
     expect(response.json().capabilities).toContain('appeal');
+    expect(response.json().ledgerMode).toBe('unavailable');
   });
 });

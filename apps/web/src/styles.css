@@ -34,6 +34,10 @@ a { color: inherit; text-decoration: none; }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: white; background: linear-gradient(145deg, #08724f, #255f89); box-shadow: 0 6px 16px rgba(8,114,79,.16); }
 .network-state { display: flex; align-items: center; gap: 8px; color: var(--green); font-size: 13px; font-weight: 600; }
 .network-state > span { width: 8px; height: 8px; border-radius: 50%; background: #18a566; box-shadow: 0 0 0 4px rgba(24,165,102,.1); }
+.network-state.mode-demo { color: #8a641d; }
+.network-state.mode-demo > span { background: #d39b2c; box-shadow: 0 0 0 4px rgba(211,155,44,.12); }
+.network-state.mode-unavailable { color: #8c4d45; }
+.network-state.mode-unavailable > span { background: #aa655b; box-shadow: 0 0 0 4px rgba(170,101,91,.12); }
 .desktop-nav { display: flex; align-items: center; gap: 26px; margin-left: auto; color: #454b47; font-size: 14px; font-weight: 600; }
 .desktop-nav a:hover { color: var(--green); }
 .nav-verify { display: inline-flex; align-items: center; gap: 7px; padding: 10px 16px; border-radius: 9px; color: white !important; background: #111; box-shadow: var(--shadow); }
