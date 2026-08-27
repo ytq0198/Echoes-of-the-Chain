@@ -2,7 +2,7 @@
 
 面向区块链课程大作业与 CCF 大学生区块链技术与创新应用竞赛的学生团队项目。
 
-当前阶段：Iteration 10 无 Docker 原生 Fabric 恢复。真实 Fabric 2.5 LTS 网络、三类属性身份、短期签名会话、Fastify Gateway 与四角色 Web 工作台已经贯通；在共享 Docker 故障下，orderer、双 peer 与 grade 0.9 Chaincode-as-a-Service 已通过原生进程恢复，原子 CSV 批量导入取得新的真实链上证据。
+当前阶段：Iteration 11 原生 Fabric 可运维化与鉴权 UI 复验。真实 Fabric 2.5 LTS 网络、三类属性身份、短期签名会话、Fastify Gateway 与四角色 Web 工作台已经贯通；在共享 Docker 故障下，orderer、双 peer 与 grade 0.9 Chaincode-as-a-Service 已通过原生进程恢复，并完成无损重启、冷备份/恢复、确定性演示播种和真实鉴权浏览器验收。
 
 课程答辩和 CCF 竞赛提交始终对应同一个项目、同一仓库和同一套架构；课程验收只是连续开发过程中的一个里程碑。
 
@@ -24,6 +24,8 @@
 - 学生可撤销的限时/限次字段披露授权，令牌明文仅在创建时返回一次
 - transient 令牌绑定校验、链上原子消费计数和 `Cache-Control: no-store` 最小字段响应
 - UTF-8 CSV 本地预检、批内去重和单笔 Fabric 交易原子批量草稿写入
+- Docker 无关的原生 Fabric 启停、双 Peer 一致性查询、冷备份、校验与受保护恢复
+- 可重复执行且不重复写链的答辩演示凭证/申诉播种工具
 
 ## 工程结构
 
