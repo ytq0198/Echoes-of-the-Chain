@@ -15,8 +15,13 @@ esac
 
 mkdir -p "${BACKUP_ROOT}"
 umask 077
-tar -C "${NETWORK_ROOT}" -czf "${ARCHIVE}" organizations channel-artifacts
+trap 'rm -f -- "${ARCHIVE}" "${ARCHIVE}.sha256"' ERR
+tar -C "${NETWORK_ROOT}" -czf "${ARCHIVE}" \
+  organizations/peerOrganizations \
+  organizations/ordererOrganizations \
+  channel-artifacts
 sha256sum "${ARCHIVE}" >"${ARCHIVE}.sha256"
 chmod 0600 "${ARCHIVE}" "${ARCHIVE}.sha256"
 tar -tzf "${ARCHIVE}" >/dev/null
+trap - ERR
 echo "Created verified recovery archive: ${ARCHIVE}"

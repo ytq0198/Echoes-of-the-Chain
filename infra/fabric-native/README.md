@@ -7,6 +7,6 @@ This fallback runs Fabric directly from the pinned binaries already downloaded b
 ./infra/fabric-native/backup-materials.sh
 ```
 
-The backup contains private MSP keys and therefore remains outside Git with mode `0600`. Set `CHAINGRADE_BACKUP_ROOT` only to another directory below `/mnt/localDisk3/weizian`.
+The backup contains peer/orderer/application MSP private keys and therefore remains outside Git with mode `0600`. Docker-owned Fabric CA server internals are deliberately excluded; they are not required to restart the retained nodes. Set `CHAINGRADE_BACKUP_ROOT` only to another directory below `/mnt/localDisk3/weizian`.
 
 Orderer, peer, channel lifecycle and Chaincode-as-a-Service commands will be added after the preflight and recovery archive pass on the school server.
