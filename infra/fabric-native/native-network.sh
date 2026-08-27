@@ -112,7 +112,7 @@ start_peer() {
     echo "${name} is already running"
     return
   fi
-  mkdir -p "${DATA_ROOT}/${name}"
+  mkdir -p "${DATA_ROOT}/${name}" "${DATA_ROOT}/${name}/snapshots"
   (
     export FABRIC_CFG_PATH="${CONFIG_ROOT}"
     export FABRIC_LOGGING_SPEC=INFO
@@ -130,6 +130,7 @@ start_peer() {
     export CORE_PEER_TLS_KEY_FILE="${base}/tls/server.key"
     export CORE_PEER_TLS_ROOTCERT_FILE="${base}/tls/ca.crt"
     export CORE_PEER_FILESYSTEMPATH="${DATA_ROOT}/${name}"
+    export CORE_LEDGER_SNAPSHOTS_ROOTDIR="${DATA_ROOT}/${name}/snapshots"
     export CORE_OPERATIONS_LISTENADDRESS="127.0.0.1:${operations_port}"
     export CORE_METRICS_PROVIDER=disabled
     export CORE_CHAINCODE_EXTERNALBUILDERS="[{\"name\":\"ccaas_builder\",\"path\":\"${SAMPLES_ROOT}/builders/ccaas\",\"propagateEnvironment\":[\"CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG\"]}]"
@@ -194,7 +195,7 @@ status() {
 
 case "${1:-}" in
   up)
-    "${SCRIPT_DIR}/preflight.sh"
+    CHAINGRADE_ALLOW_OCCUPIED_PORTS=true "${SCRIPT_DIR}/preflight.sh"
     prepare_channel_block
     start_orderer
     start_peer 1 Org1MSP 7051 7052 9444

@@ -37,6 +37,10 @@ for path in "${required_files[@]}"; do
 done
 
 for port in "${reserved_ports[@]}"; do
+  if [[ "${CHAINGRADE_ALLOW_OCCUPIED_PORTS:-false}" == "true" ]]; then
+    echo "SKIP port ${port} (resuming managed native runtime)"
+    continue
+  fi
   if ss -ltnH "sport = :${port}" | grep -q .; then
     echo "FAIL port ${port} is already listening" >&2
     failures=$((failures + 1))
