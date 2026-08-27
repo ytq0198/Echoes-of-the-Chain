@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { canonicalJson } from '../lib/canonical-json.js';
 import { loadFabricConfig } from '../ledger/fabric-config.js';
@@ -25,7 +27,10 @@ const appealDetails = Buffer.from(
 );
 const reasonHash = createHash('sha256').update(appealDetails).digest('hex');
 
-const ledger = new FabricCredentialLedger(loadFabricConfig());
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+const ledger = new FabricCredentialLedger(
+  loadFabricConfig({ ...process.env, CHAINGRADE_PROJECT_ROOT: projectRoot }),
+);
 
 try {
   let credential = await readOrUndefined(() => ledger.read(credentialId));
