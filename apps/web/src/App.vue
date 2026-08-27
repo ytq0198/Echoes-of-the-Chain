@@ -932,43 +932,43 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
             </div>
           </header>
 
-          <dl class="trust-summary">
+          <section class="trust-summary" aria-label="流程状态示意">
             <div>
               <PhCheckCircle :size="28" weight="duotone" /><span
-                ><dt>凭证状态</dt>
-                <dd>已通过独立复核</dd>
+                ><span class="summary-term">凭证状态</span>
+                <strong>已通过独立复核</strong>
                 <small>当前状态：ACTIVE</small></span
               >
             </div>
             <div>
               <PhGlobe :size="28" weight="duotone" /><span
-                ><dt>公开状态</dt>
-                <dd>私有成绩</dd>
+                ><span class="summary-term">公开状态</span>
+                <strong>私有成绩</strong>
                 <small>隐式私有集合</small></span
               >
             </div>
             <div>
               <PhFileText :size="28" weight="duotone" /><span
-                ><dt>教师签发</dt>
-                <dd>签发完成</dd>
+                ><span class="summary-term">教师签发</span>
+                <strong>签发完成</strong>
                 <small>1 项凭证</small></span
               >
             </div>
             <div>
               <PhShieldCheck :size="28" weight="duotone" /><span
-                ><dt>独立复核</dt>
-                <dd>复核完成</dd>
+                ><span class="summary-term">独立复核</span>
+                <strong>复核完成</strong>
                 <small>1 项复核</small></span
               >
             </div>
             <div>
               <PhUserCircle :size="28" weight="duotone" /><span
-                ><dt>学生凭证</dt>
-                <dd>学生持有</dd>
+                ><span class="summary-term">学生凭证</span>
+                <strong>学生持有</strong>
                 <small>本人属性约束</small></span
               >
             </div>
-          </dl>
+          </section>
 
           <section class="evidence-ledger" aria-labelledby="evidence-heading">
             <div class="table-heading">
