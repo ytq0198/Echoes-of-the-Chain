@@ -41,7 +41,8 @@ is_running() {
 prepare_channel_block() {
   mkdir -p "${GENERATED_CONFIG}"
   ln -sfn "${ORGANIZATIONS}" "${RUNTIME_ROOT}/organizations"
-  sed 's/orderer\.example\.com/localhost/g' \
+  sed -e 's/Host: orderer\.example\.com/Host: localhost/' \
+    -e 's/- orderer\.example\.com:7050/- localhost:7050/' \
     "${NETWORK_ROOT}/configtx/configtx.yaml" >"${GENERATED_CONFIG}/configtx.yaml"
   FABRIC_CFG_PATH="${GENERATED_CONFIG}" "${BIN_ROOT}/configtxgen" \
     -profile ChannelUsingRaft -outputBlock "${CHANNEL_ROOT}/${CHANNEL_NAME}.block" \
