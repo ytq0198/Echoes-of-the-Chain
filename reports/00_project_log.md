@@ -231,3 +231,16 @@
 
 - 学校服务器共享 Docker 元数据的 `layer does not exist` 故障仍待管理员处理，本阶段未执行可能影响其他用户的全局清理。
 - `grade 0.9 / sequence 1` 的真实 Fabric 部署、双 peer committed definition 与真实批量 transaction ID 仍须在 Docker 恢复后补验；当前报告只把本地 HTTP 流程称为离线演示账本验收。
+
+## 2026-08-27：无 Docker 原生 Fabric 恢复
+
+- 共享 Docker 的 `layer does not exist` 未修复，因此建立完全位于 `/mnt/localDisk3/weizian` 的原生 Fabric 2.5.16 备用运行方式。
+- 对保留的 peer/orderer/应用 MSP、TLS 和通道材料制作 `0600` 权限、SHA-256 校验通过的恢复归档。
+- 新增原生环境预检、节点启动/停止/状态/受限 reset 和 CCAAS 链码生命周期脚本；全流程不调用 Docker。
+- 原生 orderer 成功创建新 `chaingrade` 通道并当选 Raft leader，Org1/Org2 peer 均加入通道。
+- `grade 0.9 / sequence 1` 以 Node.js Chaincode-as-a-Service 提交，Org1MSP/Org2MSP 批准均为 true，commit 在两个 peer 均为 VALID。
+- 两个 peer 最终高度均为 9，current/previous block hash 完全一致，恢复后日志无 panic。
+- 真实 Gateway 完成 issuer 创建、reviewer 批准和公开验真；ACTIVE 交易 ID 为 `c7f5827e87f1a1964e89d38b8621aa255f5aa3369f9853422a48c5e92becf7a7`。
+- 真实原子批量导入两条记录共享交易 `fe1cd817308b9a18fb4375a9f53f99c97f9ec9cc1e971f66b4fef11a378c0cce`；混合冲突返回 409，批内新记录仍为 404。
+- 临时无认证 Gateway 仅监听 localhost，验收结束后已停止；原生网络和外部链码继续运行。
+- 旧 Docker volume 的历史 transaction ID 未恢复，本次证据明确属于新恢复网络，不与旧账本混淆。

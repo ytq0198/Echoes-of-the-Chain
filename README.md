@@ -2,7 +2,7 @@
 
 面向区块链课程大作业与 CCF 大学生区块链技术与创新应用竞赛的学生团队项目。
 
-当前阶段：Iteration 9 原子成绩批量导入。真实 Fabric 2.5 LTS 网络、三类属性身份、短期签名会话、Fastify Gateway 与四角色 Web 工作台已经贯通；学生可创建限时最小字段披露，教师可将最多 50 条 CSV 成绩草稿预检后通过单笔 Fabric 交易原子写入。
+当前阶段：Iteration 10 无 Docker 原生 Fabric 恢复。真实 Fabric 2.5 LTS 网络、三类属性身份、短期签名会话、Fastify Gateway 与四角色 Web 工作台已经贯通；在共享 Docker 故障下，orderer、双 peer 与 grade 0.9 Chaincode-as-a-Service 已通过原生进程恢复，原子 CSV 批量导入取得新的真实链上证据。
 
 课程答辩和 CCF 竞赛提交始终对应同一个项目、同一仓库和同一套架构；课程验收只是连续开发过程中的一个里程碑。
 
