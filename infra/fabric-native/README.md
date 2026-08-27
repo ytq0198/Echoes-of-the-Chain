@@ -9,6 +9,8 @@ This fallback runs Fabric directly from the pinned binaries already downloaded b
 ./infra/fabric-native/native-network.sh status
 ./infra/fabric-native/native-network.sh logs
 ./infra/fabric-native/native-network.sh down
+./infra/fabric-native/deploy-chaincode.sh deploy
+./infra/fabric-native/deploy-chaincode.sh status
 ```
 
 The backup contains peer/orderer/application MSP private keys and therefore remains outside Git with mode `0600`. Docker-owned Fabric CA server internals are deliberately excluded; they are not required to restart the retained nodes. Set `CHAINGRADE_BACKUP_ROOT` only to another directory below `/mnt/localDisk3/weizian`.
