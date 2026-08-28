@@ -2,7 +2,7 @@
 
 面向区块链课程大作业与 CCF 大学生区块链技术与创新应用竞赛的学生团队项目。
 
-当前阶段：Iteration 11 原生 Fabric 可运维化与鉴权 UI 复验。真实 Fabric 2.5 LTS 网络、三类属性身份、短期签名会话、Fastify Gateway 与四角色 Web 工作台已经贯通；在共享 Docker 故障下，orderer、双 peer 与 grade 0.9 Chaincode-as-a-Service 已通过原生进程恢复，并完成无损重启、冷备份/恢复、确定性演示播种和真实鉴权浏览器验收。
+当前阶段：Iteration 12 统一交付与答辩彩排。真实 Fabric 2.5 LTS 网络、三类属性身份、Fastify Gateway 与四角色 Web 工作台已经贯通；在共享 Docker 故障下，原生双组织 Fabric 继续稳定运行，并新增答辩级前后端预检/启停、7 分钟课程故事线、匿名竞赛材料骨架、证据索引和匿名文本安全门。
 
 课程答辩和 CCF 竞赛提交始终对应同一个项目、同一仓库和同一套架构；课程验收只是连续开发过程中的一个里程碑。
 
@@ -26,6 +26,8 @@
 - UTF-8 CSV 本地预检、批内去重和单笔 Fabric 交易原子批量草稿写入
 - Docker 无关的原生 Fabric 启停、双 Peer 一致性查询、冷备份、校验与受保护恢复
 - 可重复执行且不重复写链的答辩演示凭证/申诉播种工具
+- 只管理项目 PID、从 Git 外私有文件加载认证环境的一键演示预检/启停工具
+- 课程与竞赛共用证据索引、7 分钟课程脚本和竞赛匿名文本扫描
 
 ## 工程结构
 
@@ -37,6 +39,7 @@ chaincode/grade-contract    Hyperledger Fabric 成绩链码
 infra/fabric               固定版本的 Fabric 开发网络与部署脚本
 design                      产品、架构、安全与阶段设计
 reports                     实验、测试与项目进程记录
+deliverables                同一项目的课程/竞赛材料编排与演示手册
 ```
 
 ## 本地验证
@@ -48,6 +51,7 @@ pnpm install --frozen-lockfile
 pnpm check
 pnpm test
 pnpm build
+pnpm delivery:check-anonymity
 ```
 
 Linux 上启动真实开发账本：
@@ -80,6 +84,7 @@ pnpm dev:api
 
 - `design/`：阶段设计、总体设计、架构与决策记录
 - `reports/`：阶段实验报告、测试记录和项目进程
+- `deliverables/`：共同证据、课程答辩、匿名竞赛材料与演示运行手册
 
 ## 团队
 

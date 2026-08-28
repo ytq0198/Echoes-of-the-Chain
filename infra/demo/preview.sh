@@ -138,7 +138,7 @@ start() {
     PATH="${PROJECT_ROOT}/.tools/node/bin:${PATH}" HOST=127.0.0.1 PORT=3000 \
     FABRIC_ENABLED=true DEMO_ENABLED=false AUTH_ENABLED=true \
     "${NODE_BIN}" "${PROJECT_ROOT}/apps/api/dist/server.js"
-  wait_http http://127.0.0.1:3000/api/meta api
+  wait_http http://127.0.0.1:3000/api/v1/meta api
   start_component web env \
     PATH="${PROJECT_ROOT}/.tools/node/bin:${PATH}" CHOKIDAR_USEPOLLING=true \
     "${COREPACK_BIN}" pnpm --filter @chaingrade/web exec vite --host 127.0.0.1
@@ -179,10 +179,10 @@ status() {
       failed=1
     fi
   done
-  if curl --fail --silent --max-time 2 http://127.0.0.1:3000/api/meta; then
+  if curl --fail --silent --max-time 2 http://127.0.0.1:3000/api/v1/meta; then
     echo
   else
-    echo "UNHEALTHY api /api/meta"
+    echo "UNHEALTHY api /api/v1/meta"
     failed=1
   fi
   return "${failed}"
