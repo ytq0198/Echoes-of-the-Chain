@@ -339,13 +339,13 @@
 
 ### 分工决定
 
-- 强璞承担“标准凭证互操作与验证体验”，40 工作点、预计 44–50 小时，包含 shared/API/Web、测试、四视口浏览器验收和报告。
-- 阳震承担“可重复性能基准与故障证据”，40 工作点、预计 44–50 小时，包含专用基准网络、负载矩阵、资源采样、故障恢复和报告。
+- 工作包 A 为“标准凭证互操作与验证体验”，40 工作点、预计 44–50 小时，包含 shared/API/Web、测试、四视口浏览器验收和报告，负责人待两名组员自主选择。
+- 工作包 B 为“可重复性能基准与故障证据”，40 工作点、预计 44–50 小时，包含专用基准网络、负载矩阵、资源采样、故障恢复和报告，负责人待两名组员自主选择。
 - 组长魏子安只负责接口冻结、两次里程碑验收、最终合并与事实核对，不继续包办日常实现。
 
 ### 新增计划文件
 
 - `design/20_next_major_stage_plan.md`
-- `design/21_qiangpu_work_package.md`
-- `design/22_yangzhen_work_package.md`
+- `design/21_work_package_a_vc_interoperability.md`
+- `design/22_work_package_b_benchmark_reliability.md`
 - `reports/17_next_major_stage_kickoff.md`
