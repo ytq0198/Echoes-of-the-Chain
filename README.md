@@ -85,6 +85,7 @@ pnpm dev:api
 - `design/`：阶段设计、总体设计、架构与决策记录
 - `reports/`：阶段实验报告、测试记录和项目进程
 - `deliverables/`：共同证据、课程答辩、匿名竞赛材料与演示运行手册
+- `deliverables/course/ChainGrade_最终实验报告.md`：以设计原因、实现形式、实测数据、失败分析和能力边界组织的课程最终实验报告
 
 ## 团队
 
