@@ -29,7 +29,7 @@ assert_managed_pid() {
 wait_http() {
   local url="$1"
   local name="$2"
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 180); do
     if curl --fail --silent --max-time 2 "${url}" >/dev/null; then
       echo "READY ${name} ${url}"
       return 0
@@ -116,10 +116,16 @@ start_component() {
 start() {
   check
   require_private_env
-  for port in 3000 5173; do
+  local name port
+  for name in api web; do
+    [[ "${name}" == api ]] && port=3000 || port=5173
     if ss -ltnH "sport = :${port}" | grep -q .; then
-      echo "Refusing to start: unmanaged process is listening on ${port}" >&2
-      return 1
+      if is_running "${name}" && assert_managed_pid "${name}"; then
+        echo "REUSING ${name} on ${port}"
+      else
+        echo "Refusing to start: unmanaged process is listening on ${port}" >&2
+        return 1
+      fi
     fi
   done
   echo "Building the single course-and-competition project..."
