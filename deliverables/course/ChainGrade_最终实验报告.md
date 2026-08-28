@@ -2,6 +2,7 @@
 
 项目名称：ChainGrade——隐私保护型可信成绩凭证管理平台  
 仓库名称：Echoes of the Chain  
+项目仓库：https://github.com/ytq0198/Echoes-of-the-Chain  
 组长：魏子安  
 组员：强璞、阳震  
 专业：计算机科学与技术  
