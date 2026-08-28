@@ -33,7 +33,7 @@ export function buildApp(options: AppOptions = {}) {
   app.get('/api/v1/meta', async () => ({
     product: 'ChainGrade',
     repository: 'Echoes-of-the-Chain',
-    phase: 'iteration-9',
+    phase: 'iteration-12',
     ledgerMode: options.ledgerMode ?? (options.ledger ? 'demo' : 'unavailable'),
     capabilities: [
       'credential-draft',

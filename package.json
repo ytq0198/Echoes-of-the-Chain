@@ -12,6 +12,7 @@
     "check": "pnpm --filter @chaingrade/shared build && pnpm -r --if-present check",
     "test": "pnpm --filter @chaingrade/shared build && pnpm -r --if-present test",
     "test:coverage": "pnpm -r --if-present test:coverage",
+    "delivery:check-anonymity": "node infra/delivery/check-anonymity.mjs",
     "dev:api": "pnpm --filter @chaingrade/api dev",
     "dev:web": "pnpm --filter @chaingrade/web dev"
   },
