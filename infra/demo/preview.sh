@@ -123,7 +123,11 @@ start() {
     fi
   done
   echo "Building the single course-and-competition project..."
-  PATH="${PROJECT_ROOT}/.tools/node/bin:${PATH}" "${COREPACK_BIN}" pnpm build
+  local package
+  for package in @chaingrade/shared @chaingrade/grade-contract @chaingrade/api @chaingrade/web; do
+    PATH="${PROJECT_ROOT}/.tools/node/bin:${PATH}" \
+      "${COREPACK_BIN}" pnpm --filter "${package}" build
+  done
   start_component api env \
     PATH="${PROJECT_ROOT}/.tools/node/bin:${PATH}" HOST=127.0.0.1 PORT=3000 \
     FABRIC_ENABLED=true DEMO_ENABLED=false AUTH_ENABLED=true \
