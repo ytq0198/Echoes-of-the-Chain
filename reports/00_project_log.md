@@ -349,3 +349,21 @@
 - `design/21_work_package_a_vc_interoperability.md`
 - `design/22_work_package_b_benchmark_reliability.md`
 - `reports/17_next_major_stage_kickoff.md`
+
+## 2026-08-29：课程答辩 PPT 重制与逐页验收
+
+### 防跑偏检查
+
+- 重制只改材料叙事和视觉，不修改业务范围，也不建立课程版/竞赛版分叉。
+- 13 页仍围绕成绩签发、独立复核、隐私、修订、申诉、授权披露和真实 Fabric 证据。
+- VC 互操作与可靠性基准仅列为下一阶段，没有写成已完成结果。
+
+### 已完成
+
+- 用 `ppt-master` 的确认、设计锁、SVG 质量门和原生 DrawingML 导出流程生成 13 页答辩稿，并用 `diagram-design` 规则重绘架构、生命周期和隐私边界。
+- 视觉采用 VEGA 可信蓝、编辑式大标题、宋体/Georgia 标题和雅黑/Segoe UI 正文；只使用 5 张项目已有真实 UI 截图。
+- 13/13 页演讲备注完成，总时长按 420 秒设计；PPTX 保留可编辑对象和淡入转场。
+- SVG 最终质量门 0 error；PPTX 包级后检通过，13 页重新渲染后 `slides_test.py` 返回 `No overflow detected`。
+- 全尺寸检查发现并修复 P12 函数覆盖率条压住 95.52% 标签的问题；统一重算四条覆盖率长度后再次导出和验收。
+- 新增 `design/23_course_defense_deck_remake.md`、`reports/18_course_defense_deck_remake.md` 和两张报告验收图。
+- 最终交付为 `deliverables/course/ChainGrade_课程答辩_重制版.pptx`，原 9 页版本保留。
