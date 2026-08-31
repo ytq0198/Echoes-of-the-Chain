@@ -7,9 +7,56 @@
  */
 @import url("./latex-upstream.css");
 
+/*
+ * Chromium sometimes cannot resolve the Latin Modern family alias even after
+ * Windows installation. Bind the fonts by their PostScript names so Typora's
+ * editor and PDF exporter use the same real faces instead of Times fallback.
+ */
+@font-face {
+  font-family: "ChainGrade Latin Modern Roman";
+  src: local("LMRoman10-Regular");
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "ChainGrade Latin Modern Roman";
+  src: local("LMRoman10-Bold");
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "ChainGrade Latin Modern Roman";
+  src: local("LMRoman10-Italic");
+  font-style: italic;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "ChainGrade Latin Modern Roman";
+  src: local("LMRoman10-BoldItalic");
+  font-style: italic;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "ChainGrade Latin Modern Mono";
+  src: local("LMMono10-Regular");
+  font-style: normal;
+  font-weight: 400;
+}
+
 :root {
-  --base-latin-font: "Latin Modern Roman", "Latin Modern Roman 10", "Times New Roman", Times;
+  --base-latin-font: "ChainGrade Latin Modern Roman", "LM Roman 10", "Latin Modern Roman", "Times New Roman", Times;
   --base-chinese-font: "家族宋", "宋体-简", "华文宋体", SimSun;
+  --base-font-size: 10.5pt;
+  --code-font: "ChainGrade Latin Modern Mono", "LM Mono 10", "Latin Modern Mono", Consolas, "Courier New";
+}
+
+/* Keep the screen A4 box and the printed A4 content area at the same 17 cm width. */
+#write {
+  box-sizing: border-box;
 }
 
 /* The report headings already contain 1, 1.1, etc.; suppress generated duplicates. */
@@ -27,9 +74,28 @@
   counter-increment: none !important;
 }
 
+/* A chapter-level TOC fits on one page and remains sufficient for a 22-page report. */
+.md-toc-content .md-toc-h3,
+.md-toc-content .md-toc-h4,
+.md-toc-content .md-toc-h5,
+.md-toc-content .md-toc-h6 {
+  display: none !important;
+}
+
+/* Prevent tall browser screenshots from being fragmented across A4 pages. */
+#write img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 18.5cm;
+  margin: 1em auto;
+  object-fit: contain;
+}
+
 /* Use the upstream cover structure while keeping its two SVG assets local. */
 #write .cover img {
   display: block;
+  width: 100%;
   max-width: 100%;
   max-height: none;
   margin: 0 auto;

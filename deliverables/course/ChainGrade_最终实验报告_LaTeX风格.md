@@ -8,7 +8,7 @@
         <img src="./typora-latex-theme/assets/ZJU-logo.svg" alt="浙江大学校徽" style="width:100%;">
     </div>
     <br><br><br><br><br><br><br><br>
-    <span style="font-family:华文黑体Bold,华文黑体,黑体;text-align:center;font-size:20pt;margin:10pt auto;line-height:30pt;">ChainGrade——隐私保护型可信成绩凭证管理平台</span>
+    <span style="font-family:华文黑体Bold,华文黑体,黑体;text-align:center;font-size:20pt;margin:10pt auto;line-height:30pt;"><span style="font-family:'ChainGrade Latin Modern Roman','LM Roman 10','Latin Modern Roman','Times New Roman',serif;font-weight:bold;">ChainGrade</span>——隐私保护型可信成绩凭证管理平台</span>
     <p style="text-align:center;font-size:14pt;margin:0 auto;">区块链技术应用实践课程大作业实验报告</p>
     <br><br>
     <table style="border:none;text-align:center;width:72%;font-family:仿宋,华文仿宋;font-size:14px;margin:0 auto;">
