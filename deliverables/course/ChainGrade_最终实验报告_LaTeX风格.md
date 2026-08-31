@@ -1,18 +1,27 @@
-<div class="cover">
-  <div class="cover-school">浙江大学</div>
-  <div class="cover-school-en">ZHEJIANG UNIVERSITY</div>
-  <div class="cover-rule"></div>
-  <div class="cover-type">区块链技术应用实践 · 课程大作业</div>
-  <div class="cover-title">ChainGrade</div>
-  <div class="cover-subtitle">隐私保护型可信成绩凭证管理平台</div>
-  <table class="cover-meta">
-    <tr><th>仓库名称</th><td>Echoes of the Chain</td></tr>
-    <tr><th>项目负责人</th><td>魏子安</td></tr>
-    <tr><th>小组成员</th><td>魏子安、强璞、阳震</td></tr>
-    <tr><th>专业</th><td>计算机科学与技术</td></tr>
-    <tr><th>项目仓库</th><td>github.com/ytq0198/Echoes-of-the-Chain</td></tr>
-    <tr><th>完成日期</th><td>2026 年 8 月 28 日</td></tr>
-  </table>
+<div class="cover" style="break-after:page;font-family:方正公文仿宋;width:100%;height:100%;border:none;margin:0 auto;text-align:center;">
+    <div style="width:60%;margin:0 auto;height:0;padding-bottom:10%;">
+        <br>
+        <img src="./typora-latex-theme/assets/ZJU-name.svg" alt="浙江大学校名" style="width:100%;">
+    </div>
+    <br><br><br><br><br>
+    <div style="width:60%;margin:0 auto;height:0;padding-bottom:40%;">
+        <img src="./typora-latex-theme/assets/ZJU-logo.svg" alt="浙江大学校徽" style="width:100%;">
+    </div>
+    <br><br><br><br><br><br><br><br>
+    <span style="font-family:华文黑体Bold,华文黑体,黑体;text-align:center;font-size:20pt;margin:10pt auto;line-height:30pt;">ChainGrade——隐私保护型可信成绩凭证管理平台</span>
+    <p style="text-align:center;font-size:14pt;margin:0 auto;">区块链技术应用实践课程大作业实验报告</p>
+    <br><br>
+    <table style="border:none;text-align:center;width:72%;font-family:仿宋,华文仿宋;font-size:14px;margin:0 auto;">
+    <tbody style="font-family:方正公文仿宋,华文仿宋;font-size:12pt;">
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">题　　目</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">ChainGrade</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">课程名称</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">区块链技术应用实践</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">姓　　名</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">魏子安</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">学　　号</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">3240101782</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">组　　别</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">魏子安、强璞、阳震</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">专　　业</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">计算机科学与技术</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">日　　期</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">2026 年 8 月 28 日</td></tr>
+    </tbody>
+    </table>
 </div>
 
 # 摘要
@@ -26,8 +35,6 @@
 # 目录
 
 [TOC]
-
-<div class="front-matter-break"></div>
 
 ## 1. 团队负责内容与最终结果
 

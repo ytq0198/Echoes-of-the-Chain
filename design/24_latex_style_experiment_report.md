@@ -1,5 +1,7 @@
 # ChainGrade 实验报告 LaTeX 风格化设计
 
+> 状态：已被 `design/25_upstream_latex_template_alignment.md` 取代。第 24 阶段的自定义封面与视觉覆盖并非最终采用方案，保留本文只用于记录设计演变。
+
 ## 1. 目标与边界
 
 本阶段只改变最终实验报告的呈现形式，不改写已经验收的实验事实。原文件 `deliverables/course/ChainGrade_最终实验报告.md` 保持不变，新增 `ChainGrade_最终实验报告_LaTeX风格.md` 作为可选交付版。
@@ -43,4 +45,3 @@ LaTeX 风格版在正文前增加三部分：
 4. Markdown 可生成包含封面、2 个 H1、17 个 H2、34 个 H3、14 个表格、7 张图片和 51 个目录链接的 HTML 结构。
 5. 上游 CSS、覆盖层、许可证和使用说明齐全。
 6. 在安装 Typora 的环境选择 `chaingrade-latex` 后，人工检查封面、摘要、目录、表格和图片分页，再导出最终 PDF。
-

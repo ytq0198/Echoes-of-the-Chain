@@ -2,196 +2,48 @@
 
 /*
  * ChainGrade Typora theme entry.
- * Upstream: Keldos-Li/typora-latex-theme v0.3.3 (GPL-3.0)
- * Keep latex-upstream.css and LICENSE beside this file.
+ * The visual system remains the upstream typora-latex-theme v0.3.3.
+ * Only compatibility fixes required by this already-numbered report are added.
  */
 @import url("./latex-upstream.css");
 
 :root {
-  --base-latin-font: "Latin Modern Roman", "Times New Roman", Times, serif;
-  --base-chinese-font: "Source Han Serif SC", "Noto Serif CJK SC", "华文宋体", SimSun, serif;
-  --title-chinese-font: "Source Han Sans SC", "思源黑体 CN", "华文黑体", SimHei, sans-serif;
-  --base-font-size: 10.5pt;
+  --base-latin-font: "Latin Modern Roman", "Latin Modern Roman 10", "Times New Roman", Times;
+  --base-chinese-font: "家族宋", "宋体-简", "华文宋体", SimSun;
 }
 
-#write {
-  max-width: 18.2cm;
-  padding-top: 1.8cm;
-  padding-right: 2cm;
-  padding-bottom: 1.8cm;
-  padding-left: 2cm;
-  color: #161616;
-}
-
-/* The source report already carries explicit chapter numbers. */
+/* The report headings already contain 1, 1.1, etc.; suppress generated duplicates. */
 #write h2::before,
 #write h3::before,
 #write h4::before,
 #write h5::before,
 #write h6::before,
-.md-toc-content .md-toc-h2 a::before,
-.md-toc-content .md-toc-h3 a::before,
-.md-toc-content .md-toc-h4 a::before,
-.md-toc-content .md-toc-h5 a::before,
-.md-toc-content .md-toc-h6 a::before {
+.md-toc-content .md-toc-h2::before,
+.md-toc-content .md-toc-h3::before,
+.md-toc-content .md-toc-h4::before,
+.md-toc-content .md-toc-h5::before,
+.md-toc-content .md-toc-h6::before {
   content: none !important;
+  counter-increment: none !important;
 }
 
-#write h1 {
-  margin-top: 1.8em;
-  margin-bottom: 1.3em;
-  font-family: var(--title-chinese-font);
-  font-size: 18pt;
-  letter-spacing: 0.12em;
-}
-
-#write h2 {
-  margin-top: 1.7em;
-  padding-bottom: 0.28em;
-  border-bottom: 0.7pt solid #333;
-  font-size: 15pt;
-}
-
-#write h3 {
-  margin-top: 1.35em;
-  font-size: 12.5pt;
-}
-
-#write p {
-  text-align: justify;
-  text-justify: inter-ideograph;
-}
-
-#write table {
-  width: 100%;
-  font-size: 9pt;
-}
-
-#write table th {
-  font-family: var(--title-chinese-font);
-  background: #f2f2f2;
-}
-
-#write img {
+/* Use the upstream cover structure while keeping its two SVG assets local. */
+#write .cover img {
   display: block;
-  max-width: 92%;
-  max-height: 19cm;
-  margin: 1.1em auto 0.5em;
-  object-fit: contain;
+  max-width: 100%;
+  max-height: none;
+  margin: 0 auto;
 }
 
-#write .cover {
-  box-sizing: border-box;
-  display: flex;
-  min-height: 24.6cm;
-  flex-direction: column;
-  align-items: center;
-  padding: 1.5cm 0.7cm 0;
-  text-align: center;
-  page-break-after: always;
-}
-
-#write .cover-school {
-  margin-top: 0.25cm;
-  font-family: var(--title-chinese-font);
-  font-size: 28pt;
-  font-weight: 700;
-  letter-spacing: 0.32em;
-  text-indent: 0.32em;
-}
-
-#write .cover-school-en {
-  margin-top: 0.18cm;
-  font-family: "Latin Modern Roman", "Times New Roman", serif;
-  font-size: 9pt;
-  letter-spacing: 0.24em;
-}
-
-#write .cover-rule {
-  width: 5.6cm;
-  margin: 0.55cm auto 1.8cm;
-  border-top: 1.4pt solid #111;
-}
-
-#write .cover-type {
-  font-family: var(--title-chinese-font);
-  font-size: 14pt;
-  letter-spacing: 0.1em;
-}
-
-#write .cover-title {
-  margin-top: 0.75cm;
-  font-family: "Latin Modern Roman", "Times New Roman", serif;
-  font-size: 38pt;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: 0.03em;
-}
-
-#write .cover-subtitle {
-  margin-top: 0.38cm;
-  font-family: var(--title-chinese-font);
-  font-size: 17pt;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-}
-
-#write .cover-meta {
-  width: 12.8cm;
-  margin-top: 2.2cm;
-  border: 0;
-  font-size: 11pt;
-}
-
-#write .cover-meta tr,
-#write .cover-meta th,
-#write .cover-meta td {
-  border: 0;
+#write .cover table,
+#write .cover tr,
+#write .cover td {
   background: transparent;
 }
 
-#write .cover-meta th {
-  width: 3.2cm;
-  padding: 0.22cm 0.38cm 0.13cm 0;
-  font-weight: 500;
-  text-align: justify;
-  text-align-last: justify;
-}
-
-#write .cover-meta td {
-  padding: 0.22cm 0 0.13cm 0.55cm;
-  border-bottom: 0.6pt solid #444;
-  text-align: left;
-}
-
-#write .front-matter-break {
-  height: 0;
-  page-break-after: always;
-}
-
-#write .md-toc {
-  margin: 0.4cm 0 0;
-}
-
 @media print {
-  @page {
-    size: A4;
-    margin: 1.8cm 2cm 1.8cm 2cm;
-  }
-
-  #write {
-    max-width: none;
-    padding: 0;
-  }
-
-  #write h2,
-  #write h3 {
-    break-after: avoid-page;
-  }
-
-  #write table,
-  #write figure,
-  #write pre {
-    break-inside: avoid;
+  /* Start the report body on a fresh page without an extra blank page. */
+  #write h2:first-of-type {
+    break-before: page !important;
   }
 }
