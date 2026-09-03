@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260902T145232Z",
+  "method": "nearest-rank percentiles; repeat summary is median with min-max range",
+  "cells": 84,
+  "sourceFinishedAt": "2026-09-02T15:49:59.658Z"
+}
