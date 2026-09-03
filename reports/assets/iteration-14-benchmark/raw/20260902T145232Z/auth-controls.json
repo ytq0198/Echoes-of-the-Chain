@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "controls": [
+    {
+      "name": "private-query-without-session",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "passed": true
+    },
+    {
+      "name": "private-query-wrong-role",
+      "expectedStatus": 403,
+      "actualStatus": 403,
+      "passed": true
+    }
+  ]
+}

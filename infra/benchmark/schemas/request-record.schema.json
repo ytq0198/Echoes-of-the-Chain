@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chaingrade.invalid/schemas/benchmark-request-record-v1.json",
+  "title": "Anonymized benchmark request record",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "cellId", "variant", "phase", "concurrency", "repeat", "worker", "sequence", "stage", "startedAt", "completedAt", "latencyMs", "ok", "status", "errorCode", "transactionId"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runId": { "type": "string" },
+    "cellId": { "type": "string" },
+    "variant": { "enum": ["public-verify", "student-private", "issue-review", "batch-1", "batch-10", "batch-25", "batch-50"] },
+    "phase": { "const": "sample" },
+    "concurrency": { "enum": [1, 5, 10, 20] },
+    "repeat": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "worker": { "type": "integer", "minimum": 0 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "stage": { "type": "string" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "latencyMs": { "type": "number", "minimum": 0 },
+    "ok": { "type": "boolean" },
+    "status": { "type": "integer", "minimum": 0, "maximum": 599 },
+    "errorCode": { "type": "string" },
+    "transactionId": { "type": "string" },
+    "batchSize": { "enum": [1, 10, 25, 50] },
+    "logicalLatencyMs": { "type": "number", "minimum": 0 },
+    "logicalStartedAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}
