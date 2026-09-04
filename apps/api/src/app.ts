@@ -8,6 +8,7 @@ import { registerHttpErrorHandler } from './lib/http-errors.js';
 import { registerAppealRoutes } from './routes/appeals.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerCredentialRoutes } from './routes/credentials.js';
+import { registerVerifyRoutes } from './routes/verify.js';
 
 interface AppOptions {
   ledger?: CredentialLedger;
@@ -46,6 +47,8 @@ export function buildApp(options: AppOptions = {}) {
       'fabric-gateway',
       'bounded-disclosure',
       'atomic-grade-import',
+      'vc-export',
+      'vc-verify',
     ],
   }));
 
@@ -57,6 +60,7 @@ export function buildApp(options: AppOptions = {}) {
   };
   void app.register(registerCredentialRoutes, routeOptions);
   void app.register(registerAppealRoutes, routeOptions);
+  void app.register(registerVerifyRoutes, routeOptions);
   registerHttpErrorHandler(app);
 
   app.addHook('onClose', async () => {
