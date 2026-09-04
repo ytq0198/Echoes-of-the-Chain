@@ -10,6 +10,7 @@ import {
   gradeBatchImportRequestSchema,
   identifierSchema,
   sha256Schema,
+  selectedFieldsSchema,
 } from '@chaingrade/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -17,14 +18,18 @@ import { z } from 'zod';
 import { canonicalJson } from '../lib/canonical-json.js';
 import type { SessionService } from '../auth/session.js';
 import type { CredentialLedger } from '../ledger/types.js';
+import { exportCredential } from '../vc/exporter.js';
+import type { IssuerKeys } from '../vc/issuer-keys.js';
 
 interface RouteOptions {
   ledger?: CredentialLedger;
   sessions?: SessionService;
+  issuerKeys?: IssuerKeys;
 }
 
 const credentialParamsSchema = z.object({ credentialId: identifierSchema });
 const disclosureParamsSchema = z.object({ grantId: identifierSchema });
+const exportRequestSchema = z.object({ selectedFields: selectedFieldsSchema });
 
 export async function registerCredentialRoutes(
   app: FastifyInstance,
@@ -162,6 +167,30 @@ export async function registerCredentialRoutes(
     const { credentialId } = credentialParamsSchema.parse(request.params);
     reply.header('cache-control', 'no-store');
     return reply.send(await options.ledger.readPrivateDetails(credentialId));
+  });
+
+  app.post('/api/v1/credentials/:credentialId/export', async (request, reply) => {
+    if (!options.ledger) return reply.code(503).send({ code: 'FABRIC_UNAVAILABLE' });
+    if (!options.issuerKeys) return reply.code(503).send({ code: 'VC_KEYS_UNAVAILABLE' });
+    options.sessions?.authorize(request, 'student', { csrf: true });
+    const { credentialId } = credentialParamsSchema.parse(request.params);
+    const input = exportRequestSchema.parse(request.body);
+
+    const record = await options.ledger.read(credentialId);
+    if (record.status !== 'ACTIVE') {
+      return reply.code(409).send({ code: 'INVALID_STATE', message: '仅 ACTIVE 凭证可导出' });
+    }
+
+    const privateDetails = await options.ledger.readPrivateDetails(credentialId);
+    const credential = exportCredential(
+      record,
+      privateDetails,
+      input.selectedFields,
+      options.issuerKeys,
+    );
+
+    reply.header('cache-control', 'no-store');
+    return reply.send(credential);
   });
 
   app.get('/api/v1/credentials/:credentialId/verify', async (request, reply) => {
