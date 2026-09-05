@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   AppealStatus,
+  CredentialFile,
   CredentialStatus,
   DisclosureField,
   DisclosureResult,
@@ -187,6 +188,14 @@ const disclosureForm = ref({
   expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString().slice(0, 16),
   maxUses: 1,
 });
+const exportPanelOpen = ref(false);
+const exportState = ref<RequestState>('idle');
+const exportMessage = ref('');
+const exportCopyMessage = ref('');
+const exportedCredential = ref<CredentialFile>();
+const exportForm = ref({
+  selectedFields: ['courseName', 'score', 'grade'] as DisclosureField[],
+});
 const appealState = ref<RequestState>('idle');
 const appealMessage = ref('');
 const submittedAppeal = ref<PublicAppealRecord>();
@@ -312,6 +321,13 @@ function openDisclosurePanel(): void {
   disclosureToken.value = '';
   createdDisclosure.value = undefined;
 }
+function openExportPanel(): void {
+  exportPanelOpen.value = true;
+  exportMessage.value = '';
+  exportCopyMessage.value = '';
+  exportState.value = 'idle';
+  exportedCredential.value = undefined;
+}
 async function copyShareLink(): Promise<void> {
   try {
     await navigator.clipboard.writeText(verificationShareUrl.value);
@@ -344,6 +360,49 @@ function openSharedDisclosure(): void {
     verifier: disclosureForm.value.verifier,
   };
   openView('verify');
+}
+async function exportCredential(): Promise<void> {
+  if (!studentRecord.value) return;
+  exportState.value = 'loading';
+  exportMessage.value = '';
+  exportCopyMessage.value = '';
+  try {
+    exportedCredential.value = await requestJson<CredentialFile>(
+      `/api/v1/credentials/${studentRecord.value.credentialId}/export`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ selectedFields: exportForm.value.selectedFields }),
+      },
+    );
+    exportState.value = 'success';
+    exportMessage.value = '标准凭证已生成。';
+  } catch (error) {
+    exportState.value = 'error';
+    exportMessage.value = error instanceof Error ? error.message : '导出失败';
+  }
+}
+function downloadExportedCredential(): void {
+  if (!exportedCredential.value) return;
+  const content = JSON.stringify(exportedCredential.value, null, 2);
+  const blob = new Blob([content], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `chaingrade-${exportedCredential.value.id.replace(/:/g, '-')}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+async function copyExportDigest(): Promise<void> {
+  if (!exportedCredential.value) return;
+  try {
+    await navigator.clipboard.writeText(exportedCredential.value.evidence.detailHash);
+    exportCopyMessage.value = '摘要已复制';
+  } catch {
+    exportCopyMessage.value = '请手动复制';
+  }
 }
 function hydrateVerificationFromUrl(): void {
   const params = new URLSearchParams(window.location.search);
@@ -518,6 +577,7 @@ function selectStudentItem(record: PublicCredentialRecord): void {
   privateDetails.value = undefined;
   sharePanelOpen.value = false;
   disclosurePanelOpen.value = false;
+  exportPanelOpen.value = false;
 }
 function refreshCurrentWorkspace(): void {
   if (!sessionMatchesView.value) return;
@@ -1901,6 +1961,13 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
                 >
                   创建披露授权
                 </button>
+                <button
+                  class="button secondary"
+                  :disabled="studentRecord.status !== 'ACTIVE'"
+                  @click="openExportPanel"
+                >
+                  导出标准凭证
+                </button>
               </div>
             </div>
           </article>
@@ -1924,6 +1991,72 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
               </div>
             </div>
           </article>
+          <section
+            v-if="exportPanelOpen && studentRecord"
+            class="operation-panel export-panel"
+          >
+            <div class="operation-heading">
+              <div>
+                <p class="eyebrow">STANDARD CREDENTIAL EXPORT</p>
+                <h3>导出标准凭证</h3>
+              </div>
+              <span>可下载 · 可独立验证</span>
+            </div>
+            <p class="panel-lead">
+              勾选要写入凭证的字段，生成一份带 Ed25519 签名与链上锚定的标准化凭证。默认二维码仍只含验证地址、凭证 ID 与摘要，不包含分数、课程名或盐值。
+            </p>
+            <form class="compact-form" @submit.prevent="exportCredential">
+              <fieldset class="field wide disclosure-fields">
+                <legend>导出字段</legend>
+                <label
+                  ><input
+                    v-model="exportForm.selectedFields"
+                    type="checkbox"
+                    value="courseName"
+                  />课程名称</label
+                ><label
+                  ><input
+                    v-model="exportForm.selectedFields"
+                    type="checkbox"
+                    value="score"
+                  />成绩分数</label
+                ><label
+                  ><input
+                    v-model="exportForm.selectedFields"
+                    type="checkbox"
+                    value="grade"
+                  />成绩等级</label
+                >
+              </fieldset>
+              <button
+                class="button primary"
+                :disabled="
+                  exportState === 'loading' || exportForm.selectedFields.length === 0
+                "
+              >
+                {{ exportState === 'loading' ? '正在导出…' : '生成标准凭证' }}
+              </button>
+              <p v-if="exportMessage" class="notice" :class="exportState">
+                {{ exportMessage }}
+              </p>
+            </form>
+            <article v-if="exportedCredential" class="disclosure-secret">
+              <div>
+                <h4>标准凭证已生成</h4>
+                <p>
+                  {{ exportedCredential.id }} · 摘要
+                  {{ exportedCredential.evidence.detailHash.slice(0, 16) }}…
+                </p>
+                <div class="share-actions">
+                  <button class="button secondary" type="button" @click="downloadExportedCredential">
+                    下载凭证 JSON</button
+                  ><button class="button primary" type="button" @click="copyExportDigest">
+                    {{ exportCopyMessage || '复制验真摘要' }}</button
+                  >
+                </div>
+              </div>
+            </article>
+          </section>
           <section
             v-if="disclosurePanelOpen && studentRecord"
             class="operation-panel disclosure-panel"
