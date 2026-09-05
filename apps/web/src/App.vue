@@ -2130,14 +2130,14 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
                 {{ exportMessage }}
               </p>
             </form>
-            <article v-if="exportedCredential" class="disclosure-secret">
+            <article v-if="exportedCredential" class="export-result">
               <div>
                 <h4>标准凭证已生成</h4>
                 <p>
                   {{ exportedCredential.id }} · 摘要
                   {{ exportedCredential.evidence.detailHash.slice(0, 16) }}…
                 </p>
-                <div class="share-actions">
+                <div class="export-actions">
                   <button class="button secondary" type="button" @click="downloadExportedCredential">
                     下载凭证 JSON</button
                   ><button class="button secondary" type="button" @click="copyExportDigest">
