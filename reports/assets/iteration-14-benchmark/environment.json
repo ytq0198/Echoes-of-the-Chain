@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "note": "Measured on the current WSL environment, not the originally designated server.",
+  "before": {
+    "capturedAt": "2026-09-02T14:52:32.117Z",
+    "gitCommit": "f449379f99a6ec213b450c854a05d49acf06b176",
+    "gitDirty": true,
+    "platform": "current-wsl-authorized-substitute",
+    "os": {
+      "family": "Linux",
+      "wsl": true,
+      "kernelRelease": "6.18.33.2-microsoft-standard-WSL2"
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 8845H w/ Radeon 780M Graphics",
+      "logicalCores": 16
+    },
+    "memory": {
+      "totalGiB": 7.4,
+      "freeGiBAtCapture": 5.05
+    },
+    "versions": {
+      "node": "v22.23.2",
+      "peer": "Version: v2.5.16",
+      "orderer": "Version: v2.5.16"
+    },
+    "chaincode": {
+      "name": "grade",
+      "expectedSequence": 1,
+      "committedDefinition": "Committed chaincode definition for chaincode 'grade' on channel 'chaingrade-benchmark':\nVersion: 1.0, Sequence: 1, Endorsement Plugin: escc, Validation Plugin: vscc, Approvals: [Org1MSP: true, Org2MSP: true]"
+    },
+    "ledger": {
+      "channel": "chaingrade-benchmark",
+      "org1": {
+        "height": 4,
+        "currentBlockHash": "+6z3UmhHMgx2BORn3EKr3HX9GgoTuG/oMxNizSK2ZN4=",
+        "previousBlockHash": "w2a9ZIdZgJgophc82oau4FKLHCMbsZo7XK+2DWYVQag="
+      },
+      "org2": {
+        "height": 4,
+        "currentBlockHash": "+6z3UmhHMgx2BORn3EKr3HX9GgoTuG/oMxNizSK2ZN4=",
+        "previousBlockHash": "w2a9ZIdZgJgophc82oau4FKLHCMbsZo7XK+2DWYVQag="
+      },
+      "consistent": true
+    }
+  },
+  "after": {
+    "capturedAt": "2026-09-02T16:20:30.809Z",
+    "gitCommit": "f449379f99a6ec213b450c854a05d49acf06b176",
+    "gitDirty": true,
+    "platform": "current-wsl-authorized-substitute",
+    "os": {
+      "family": "Linux",
+      "wsl": true,
+      "kernelRelease": "6.18.33.2-microsoft-standard-WSL2"
+    },
+    "cpu": {
+      "model": "AMD Ryzen 7 8845H w/ Radeon 780M Graphics",
+      "logicalCores": 16
+    },
+    "memory": {
+      "totalGiB": 7.4,
+      "freeGiBAtCapture": 4.83
+    },
+    "versions": {
+      "node": "v22.23.2",
+      "peer": "Version: v2.5.16",
+      "orderer": "Version: v2.5.16"
+    },
+    "chaincode": {
+      "name": "grade",
+      "expectedSequence": 1,
+      "committedDefinition": "Committed chaincode definition for chaincode 'grade' on channel 'chaingrade-benchmark':\nVersion: 1.0, Sequence: 1, Endorsement Plugin: escc, Validation Plugin: vscc, Approvals: [Org1MSP: true, Org2MSP: true]"
+    },
+    "ledger": {
+      "channel": "chaingrade-benchmark",
+      "org1": {
+        "height": 4315,
+        "currentBlockHash": "v4HhMh0DrRbMDQfDfuJv9gjtXHhPR1lXKRs9LMiJUUI=",
+        "previousBlockHash": "DlGi3/m1Yl7IRsEqv7tac1pM/TOCpznOxQVlqjhk71A="
+      },
+      "org2": {
+        "height": 4315,
+        "currentBlockHash": "v4HhMh0DrRbMDQfDfuJv9gjtXHhPR1lXKRs9LMiJUUI=",
+        "previousBlockHash": "DlGi3/m1Yl7IRsEqv7tac1pM/TOCpznOxQVlqjhk71A="
+      },
+      "consistent": true
+    }
+  }
+}

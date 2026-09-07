@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260902T145232Z",
+  "startHeight": 12,
+  "endHeight": 4315,
+  "blocksInspected": 4303,
+  "validTransactions": 32527,
+  "invalidTransactions": 27,
+  "explainedInvalidTransactions": 27,
+  "unknownInvalidTransactions": 0,
+  "matrixEndHeight": 4172,
+  "matrixInvalidTransactions": 0,
+  "postMatrixInvalidTransactions": 27,
+  "unexplainedTransactions": 0,
+  "invalidByCode": {
+    "11": 27
+  },
+  "invalidDetails": [
+    {
+      "block": 4172,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "a0e764f0fb46f4227229ca71fc74218319443c9d1f975e97ab33fb1f23e04367",
+      "timestamp": "2026-09-02T15:50:00.990Z"
+    },
+    {
+      "block": 4172,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "28a2da02309ff970145d79fb30979947c90b9122f2abf6cf1af5f34cacc277f4",
+      "timestamp": "2026-09-02T15:50:01.993Z"
+    },
+    {
+      "block": 4173,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "c6b1850c3dd51a2151958db0dddbeebeeeaad6d60d46d303d4a56700aa68dafb",
+      "timestamp": "2026-09-02T15:50:03.996Z"
+    },
+    {
+      "block": 4174,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "3ddf68a9b905073f48a0db27802a07c89051ed10e94063ece4a062a594e1dc6d",
+      "timestamp": "2026-09-02T15:50:04.220Z"
+    },
+    {
+      "block": 4175,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "ad6469b3308666d671dbf7c8370d36d1dd651ee4f7bbbba455d387d9d047ad2d",
+      "timestamp": "2026-09-02T15:50:06.227Z"
+    },
+    {
+      "block": 4176,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "02f9aea3bf4f32a1eafe2ca043d02b4e433b5be3cc92d7826270ba1f3a526a69",
+      "timestamp": "2026-09-02T15:50:08.229Z"
+    },
+    {
+      "block": 4178,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "88cb23bd11e51ef29e15ca5c0e4bdcd5c37901f89c672340852b069e0f02cc9b",
+      "timestamp": "2026-09-02T15:50:13.525Z"
+    },
+    {
+      "block": 4179,
+      "txIndex": 0,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "e78574b6046b67e07cb25cebc4db022f5e3700b0d3f9b5764f7a0a99f5b99c24",
+      "timestamp": "2026-09-02T15:50:14.533Z"
+    },
+    {
+      "block": 4180,
+      "txIndex": 0,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "af9e28d51994279ab4ac7bd0bfe35ae52bd7c85796766a16bab18a0b9d8604e4",
+      "timestamp": "2026-09-02T15:50:16.540Z"
+    },
+    {
+      "block": 4181,
+      "txIndex": 0,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "00499439f0709329703729d3f6411efe875846bbaccb1e7e5165fd18a2bda49c",
+      "timestamp": "2026-09-02T15:50:18.545Z"
+    },
+    {
+      "block": 4181,
+      "txIndex": 3,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "035ee3b9bc3464b35c5f8a2f5f0c031ff4bd2047ace89d01702634c8ea1a0d7d",
+      "timestamp": "2026-09-02T15:50:20.547Z"
+    },
+    {
+      "block": 4182,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "ec4edee97650e2086f663a26a6fc87ed3898b2c6bfe14e50f9b9708d751b4157",
+      "timestamp": "2026-09-02T15:50:22.550Z"
+    },
+    {
+      "block": 4184,
+      "txIndex": 0,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "5550c364e1dbb1a40c43d6f255118704df1666d3aa0a3234914d80a3e37d43f4",
+      "timestamp": "2026-09-02T15:50:24.553Z"
+    },
+    {
+      "block": 4184,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "a96b62c2765985981dbcdf9bf6a8d325f821b1bcacfc3eb839833dd32cdf3e57",
+      "timestamp": "2026-09-02T15:50:25.553Z"
+    },
+    {
+      "block": 4185,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "7e943419fb03fd4551cbfb142dc9d5ae56dd95e7dd27252de3e33102a6e4bde8",
+      "timestamp": "2026-09-02T15:50:27.560Z"
+    },
+    {
+      "block": 4186,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "3e9b8656e873bac2180378d0484fa95c8727d06c3c1caad22f0a4987d2d2eec0",
+      "timestamp": "2026-09-02T15:50:29.564Z"
+    },
+    {
+      "block": 4187,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "7ac57645d8c18b2ea7671e4b448300b34f3645aad5c83952ae073248b24d60a3",
+      "timestamp": "2026-09-02T15:50:31.568Z"
+    },
+    {
+      "block": 4194,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "f212bf58d1f4c7f8a23e48b3d834b748ca51fdd13b13b185cfc767328b6ee426",
+      "timestamp": "2026-09-02T15:50:52.068Z"
+    },
+    {
+      "block": 4195,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "9900d0591547d3861004fa4391fe459ffd50661eb6da46fbf5c199af209a3c85",
+      "timestamp": "2026-09-02T15:50:53.070Z"
+    },
+    {
+      "block": 4195,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "976a1a74639349a1d1a1d255d4fc4ce521eb1ed9607919389ce2562445756351",
+      "timestamp": "2026-09-02T15:50:55.119Z"
+    },
+    {
+      "block": 4195,
+      "txIndex": 3,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "a75ea56219f57e60c0e6913cf37f77e52c4a2105f8d5b265ec3e7b23c88c5b39",
+      "timestamp": "2026-09-02T15:50:54.094Z"
+    },
+    {
+      "block": 4197,
+      "txIndex": 0,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "b5799377deb42b55294005637a3b1608b3b5b23fb6a78f6253a589adc54020a1",
+      "timestamp": "2026-09-02T15:50:59.129Z"
+    },
+    {
+      "block": 4205,
+      "txIndex": 1,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "51ef468596ad7c24b91d0f7de1308b8aee069b7991fbc55220c82e42a548bd8b",
+      "timestamp": "2026-09-02T15:51:44.714Z"
+    },
+    {
+      "block": 4205,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "add0a53449accbddf23c00f7bd914ce9f25672a7aea1f03f71778dea770e7575",
+      "timestamp": "2026-09-02T15:51:45.739Z"
+    },
+    {
+      "block": 4206,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "e4e2b423d58e56e72de1d78451ed99bb634e181fc51bb5691ae86e895a9f24c5",
+      "timestamp": "2026-09-02T15:51:47.750Z"
+    },
+    {
+      "block": 4207,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "1acac516dc27a57e8f6078ad2e6afc7bd1c949e9574fec943a7310ef5c5c3f9f",
+      "timestamp": "2026-09-02T15:51:49.760Z"
+    },
+    {
+      "block": 4208,
+      "txIndex": 2,
+      "code": 11,
+      "name": "MVCC_READ_CONFLICT",
+      "transactionId": "152f53d7ff46dfa84c408bb8ee1347e04c1defa71c740c30226cb75c90ba6e81",
+      "timestamp": "2026-09-02T15:51:51.762Z"
+    }
+  ],
+  "source": "Org1 Peer QSCC validated blocks",
+  "finalLedger": {
+    "channel": "chaingrade-benchmark",
+    "org1": {
+      "height": 4315,
+      "currentBlockHash": "v4HhMh0DrRbMDQfDfuJv9gjtXHhPR1lXKRs9LMiJUUI=",
+      "previousBlockHash": "DlGi3/m1Yl7IRsEqv7tac1pM/TOCpznOxQVlqjhk71A="
+    },
+    "org2": {
+      "height": 4315,
+      "currentBlockHash": "v4HhMh0DrRbMDQfDfuJv9gjtXHhPR1lXKRs9LMiJUUI=",
+      "previousBlockHash": "DlGi3/m1Yl7IRsEqv7tac1pM/TOCpznOxQVlqjhk71A="
+    },
+    "consistent": true
+  },
+  "passed": true
+}

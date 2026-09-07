@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "batchSize": 1,
+  "expectedStatus": 409,
+  "actualStatus": 409,
+  "heightBefore": 1775,
+  "heightAfter": 1775,
+  "newItemsAbsent": true,
+  "passed": true
+}
