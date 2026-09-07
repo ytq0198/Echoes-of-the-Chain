@@ -66,6 +66,8 @@ FABRIC_ENABLED=true CHAINGRADE_PROJECT_ROOT="$PWD" pnpm dev:api
 
 启用受控演示认证时，复制 [`.env.example`](.env.example) 的变量到私有 shell 环境，替换所有密码和会话密钥，并设置 `AUTH_ENABLED=true`。正式 HTTPS 部署必须同时设置 `AUTH_SECURE_COOKIE=true`；仓库不会自动加载或保存真实 `.env` 文件。
 
+服务器预览由 `infra/demo/preview.sh start` 启动。首次启用 VC 导出时，脚本会在 Git 忽略的 `.runtime/private` 中生成 Ed25519 密钥对；正式部署应通过 `VC_ISSUER_PRIVATE_KEY`、`VC_ISSUER_PUBLIC_KEY` 和 `VC_PUBLIC_BASE_URL` 注入长期密钥及公开 HTTPS 地址。
+
 没有可用 Fabric 网络时，可启动明确标注的进程内演示账本。该模式用于离线演示和 UI 验收，不生成 Fabric 交易证据，也不会在界面中冒充真实链上连接：
 
 ```bash

@@ -78,11 +78,52 @@ require_private_env() {
   export AUTH_ISSUER_USERNAME AUTH_REVIEWER_USERNAME AUTH_STUDENT_USERNAME
   export AUTH_STUDENT_SUBJECT_HASH AUTH_ALLOWED_ORIGINS AUTH_TTL_SECONDS
   export AUTH_SECURE_COOKIE AUTH_ALLOW_NON_BROWSER_CLIENTS
+  prepare_vc_environment
+}
+
+prepare_vc_environment() {
+  local private_root private_key_file public_key_file
+  private_root="${PROJECT_ROOT}/.runtime/private"
+  private_key_file="${VC_ISSUER_PRIVATE_KEY_FILE:-${private_root}/vc-issuer-private.pem}"
+  public_key_file="${VC_ISSUER_PUBLIC_KEY_FILE:-${private_root}/vc-issuer-public.pem}"
+  mkdir -p "${private_root}"
+
+  if [[ -z "${VC_ISSUER_PRIVATE_KEY:-}" ]]; then
+    if [[ ! -f "${private_key_file}" ]]; then
+      [[ "${private_key_file}" == "${private_root}/vc-issuer-private.pem" ]] || {
+        echo "Configured VC private key file does not exist: ${private_key_file}" >&2
+        return 1
+      }
+      openssl genpkey -algorithm ED25519 -out "${private_key_file}"
+      chmod 600 "${private_key_file}"
+      echo "Generated private preview VC key outside Git: ${private_key_file}"
+    fi
+    VC_ISSUER_PRIVATE_KEY="$(cat "${private_key_file}")"
+  fi
+
+  if [[ -z "${VC_ISSUER_PUBLIC_KEY:-}" ]]; then
+    if [[ ! -f "${public_key_file}" ]]; then
+      [[ "${public_key_file}" == "${private_root}/vc-issuer-public.pem" ]] || {
+        echo "Configured VC public key file does not exist: ${public_key_file}" >&2
+        return 1
+      }
+      if [[ -f "${private_key_file}" ]]; then
+        openssl pkey -in "${private_key_file}" -pubout -out "${public_key_file}"
+      else
+        printf '%s\n' "${VC_ISSUER_PRIVATE_KEY}" | openssl pkey -pubout -out "${public_key_file}"
+      fi
+      chmod 600 "${public_key_file}"
+    fi
+    VC_ISSUER_PUBLIC_KEY="$(cat "${public_key_file}")"
+  fi
+
+  export VC_ISSUER_PRIVATE_KEY VC_ISSUER_PUBLIC_KEY
+  export VC_PUBLIC_BASE_URL="${VC_PUBLIC_BASE_URL:-http://127.0.0.1:3000}"
 }
 
 check() {
   local failed=0
-  for executable in curl ss stat; do
+  for executable in curl openssl ss stat; do
     command -v "${executable}" >/dev/null || { echo "MISSING ${executable}"; failed=1; }
   done
   [[ -x "${NODE_BIN}" ]] || { echo "MISSING pinned Node: ${NODE_BIN}"; failed=1; }
