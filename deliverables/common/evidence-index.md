@@ -13,7 +13,9 @@
 | 有限字段授权披露 | disclosure grant API/UI | 用途、验证者、期限、次数约束及负向测试 | `iteration-8/` | 已验证的 bearer capability |
 | 二维码公开验真 | Web 验真链接 | URL 不含成绩、盐值或申诉正文 | `iteration-5/final/10-*` | 已验证 |
 | 无 Docker 运维、备份与恢复 | `infra/fabric-native` | 冷备份 SHA-256、恢复后双 Peer 哈希一致、播种幂等 | `reports/14_native_operations_auth_ui_e2e.md` | 已验证 |
+| 标准 VC 文件互操作 | `packages/shared/src/vc`、`apps/api/src/vc`、学生导出与公开上传页 | Ed25519 签发；签名、链上状态、详情锚定三段验证；篡改/撤销/超限负向测试 | `reports/assets/iteration-14-vc/` | 已验证 |
+| 可重复性能与故障证据 | `infra/benchmark` | 7 类负载 × 4 档并发 × 3 次重复；84 个正式单元；故障稳定恢复与账本审计 | `reports/assets/iteration-14-benchmark/` | 已验证；仅代表受控实验环境 |
 | BBS+/不可链接匿名凭证 | 未合入主线 | 无 | 无 | 后续增强，不得宣称完成 |
-| 跨校联盟互认、Caliper | 未合入主线 | 无 | 无 | 后续增强，不得宣称完成 |
+| 跨校联盟互认、三 orderer 高可用 | 未合入主线 | 无 | 无 | 后续增强，不得宣称完成 |
 
 答辩和报告引用某项能力时，应同时给出实现、测试/账本与 UI 三类证据中的至少两类；涉及“真实链上”的结论必须引用真实 Fabric 证据而非进程内演示账本。

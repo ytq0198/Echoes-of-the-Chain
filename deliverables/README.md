@@ -7,7 +7,18 @@
 - `competition/`：匿名函评材料骨架；不得出现学校、指导教师或成员身份。
 - `demo/`：服务器预检、启停、隧道和故障回退手册。
 
-课程最终实验报告位于 `course/ChainGrade_最终实验报告.md`。报告以问题、设计原因、实现形式和实测数据为主线，直接引用同一项目的真实 Fabric、自动测试、恢复演练和浏览器截图证据。
+## 课程最终提交入口
+
+课程收口统一采用以下文件，不再从历史版本中自行挑选：
+
+- `course/ChainGrade_最终实验报告_LaTeX风格.pdf`：最终实验报告，A4 共 18 页。
+- `course/ChainGrade_项目介绍.docx`：项目介绍，共 16 页。
+- `course/ChainGrade_课程答辩_重制版.pptx`：7 分钟答辩稿，共 13 页。
+- `course/member-contributions.md`：三人最终分工与 4:3:3 贡献评分。
+- `course/ChainGrade_课程演示录屏脚本.md`：演示视频录制脚本。
+- `course/课程最终提交清单.md`：打包前逐项核对表。
+
+可编辑的实验报告正文位于 `course/ChainGrade_最终实验报告.md` 与 `course/ChainGrade_最终实验报告_LaTeX风格.md`。报告以问题、设计原因、实现形式和实测数据为主线，直接引用同一项目的真实 Fabric、自动测试、恢复演练和浏览器截图证据。`course/ChainGrade_课程答辩.pptx` 与名称含“修复版”的 PDF 仅作为历史版本保留，不作为最终提交入口。
 
 组员在新虚拟机中继续开发前，应阅读 `common/ChainGrade_虚拟机开发环境与适配说明.md`，完成其中的版本、端口、基础构建和 Fabric 工作模式检查。
 
