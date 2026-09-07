@@ -3,15 +3,18 @@ import Fastify from 'fastify';
 
 import type { SessionService } from './auth/session.js';
 import type { CredentialLedger } from './ledger/types.js';
+import type { IssuerKeys } from './vc/issuer-keys.js';
 import { registerHttpErrorHandler } from './lib/http-errors.js';
 import { registerAppealRoutes } from './routes/appeals.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerCredentialRoutes } from './routes/credentials.js';
+import { registerVerifyRoutes } from './routes/verify.js';
 
 interface AppOptions {
   ledger?: CredentialLedger;
   ledgerMode?: 'fabric' | 'demo' | 'unavailable';
   sessions?: SessionService;
+  issuerKeys?: IssuerKeys;
 }
 
 export function buildApp(options: AppOptions = {}) {
@@ -44,6 +47,8 @@ export function buildApp(options: AppOptions = {}) {
       'fabric-gateway',
       'bounded-disclosure',
       'atomic-grade-import',
+      'vc-export',
+      'vc-verify',
     ],
   }));
 
@@ -51,9 +56,11 @@ export function buildApp(options: AppOptions = {}) {
   const routeOptions = {
     ...(options.ledger ? { ledger: options.ledger } : {}),
     ...(options.sessions ? { sessions: options.sessions } : {}),
+    ...(options.issuerKeys ? { issuerKeys: options.issuerKeys } : {}),
   };
   void app.register(registerCredentialRoutes, routeOptions);
   void app.register(registerAppealRoutes, routeOptions);
+  void app.register(registerVerifyRoutes, routeOptions);
   registerHttpErrorHandler(app);
 
   app.addHook('onClose', async () => {

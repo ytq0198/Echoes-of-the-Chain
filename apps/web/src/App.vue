@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   AppealStatus,
+  CredentialFile,
   CredentialStatus,
   DisclosureField,
   DisclosureResult,
@@ -58,6 +59,18 @@ interface VerificationResult {
   version: number;
   updatedAt: string;
   transactionId: string;
+}
+
+interface FileVerificationResult {
+  conclusion: 'valid' | 'invalid';
+  signature: { valid: boolean; verificationMethod: string };
+  chainStatus: {
+    credentialId: string;
+    status: CredentialStatus;
+    version: number;
+    issuerMspId: string;
+  };
+  anchor: { detailHashMatch: boolean; subjectHashMatch: boolean };
 }
 
 interface BatchImportResult {
@@ -187,6 +200,14 @@ const disclosureForm = ref({
   expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString().slice(0, 16),
   maxUses: 1,
 });
+const exportPanelOpen = ref(false);
+const exportState = ref<RequestState>('idle');
+const exportMessage = ref('');
+const exportCopyMessage = ref('');
+const exportedCredential = ref<CredentialFile>();
+const exportForm = ref({
+  selectedFields: ['courseName', 'score', 'grade'] as DisclosureField[],
+});
 const appealState = ref<RequestState>('idle');
 const appealMessage = ref('');
 const submittedAppeal = ref<PublicAppealRecord>();
@@ -200,6 +221,11 @@ const verifyDetailHash = ref('ebc3ed396f7fba90bd55c28ed6233ac446b164bd0cade67435
 const verifyState = ref<RequestState>('idle');
 const verifyMessage = ref('');
 const verification = ref<VerificationResult>();
+const fileVerification = ref<FileVerificationResult>();
+const fileVerifyState = ref<RequestState>('idle');
+const fileVerifyMessage = ref('');
+const fileName = ref('');
+const dragOver = ref(false);
 const disclosureVerifyState = ref<RequestState>('idle');
 const disclosureVerifyMessage = ref('');
 const disclosureResult = ref<DisclosureResult>();
@@ -312,6 +338,13 @@ function openDisclosurePanel(): void {
   disclosureToken.value = '';
   createdDisclosure.value = undefined;
 }
+function openExportPanel(): void {
+  exportPanelOpen.value = true;
+  exportMessage.value = '';
+  exportCopyMessage.value = '';
+  exportState.value = 'idle';
+  exportedCredential.value = undefined;
+}
 async function copyShareLink(): Promise<void> {
   try {
     await navigator.clipboard.writeText(verificationShareUrl.value);
@@ -345,6 +378,55 @@ function openSharedDisclosure(): void {
   };
   openView('verify');
 }
+async function exportCredential(): Promise<void> {
+  if (!studentRecord.value) return;
+  exportState.value = 'loading';
+  exportMessage.value = '';
+  exportCopyMessage.value = '';
+  try {
+    exportedCredential.value = await requestJson<CredentialFile>(
+      `/api/v1/credentials/${studentRecord.value.credentialId}/export`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ selectedFields: exportForm.value.selectedFields }),
+      },
+    );
+    exportState.value = 'success';
+    exportMessage.value = '标准凭证已生成。';
+  } catch (error) {
+    exportState.value = 'error';
+    exportMessage.value = error instanceof Error ? error.message : '导出失败';
+  }
+}
+function downloadExportedCredential(): void {
+  if (!exportedCredential.value) return;
+  const content = JSON.stringify(exportedCredential.value, null, 2);
+  const blob = new Blob([content], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `chaingrade-${exportedCredential.value.id.replace(/:/g, '-')}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+async function copyExportDigest(): Promise<void> {
+  if (!exportedCredential.value) return;
+  try {
+    await navigator.clipboard.writeText(exportedCredential.value.evidence.detailHash);
+    exportCopyMessage.value = '摘要已复制';
+  } catch {
+    exportCopyMessage.value = '请手动复制';
+  }
+}
+function openExportedVerification(): void {
+  if (!exportedCredential.value) return;
+  verifyCredentialId.value = exportedCredential.value.id;
+  verifyDetailHash.value = exportedCredential.value.evidence.detailHash;
+  openView('verify');
+}
 function hydrateVerificationFromUrl(): void {
   const params = new URLSearchParams(window.location.search);
   const credentialId = params.get('credentialId');
@@ -362,6 +444,14 @@ function hydrateVerificationFromUrl(): void {
     };
   }
 }
+class HttpError extends Error {
+  public readonly status: number;
+  public constructor(status: number, message: string) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+}
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   const method = (init?.method ?? 'GET').toUpperCase();
@@ -370,7 +460,8 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers, credentials: 'same-origin' });
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok)
-    throw new Error(
+    throw new HttpError(
+      response.status,
       typeof payload.message === 'string' ? payload.message : `请求失败（${response.status}）`,
     );
   return payload as T;
@@ -518,6 +609,7 @@ function selectStudentItem(record: PublicCredentialRecord): void {
   privateDetails.value = undefined;
   sharePanelOpen.value = false;
   disclosurePanelOpen.value = false;
+  exportPanelOpen.value = false;
 }
 function refreshCurrentWorkspace(): void {
   if (!sessionMatchesView.value) return;
@@ -870,6 +962,64 @@ async function verifyCredential(): Promise<void> {
     verifyState.value = 'error';
     verifyMessage.value = error instanceof Error ? error.message : '验真失败';
   }
+}
+async function handleFile(file: File): Promise<void> {
+  fileName.value = file.name;
+  fileVerifyState.value = 'loading';
+  fileVerifyMessage.value = '';
+  fileVerification.value = undefined;
+  try {
+    const text = await file.text();
+    fileVerification.value = await requestJson<FileVerificationResult>('/api/v1/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/vc+json' },
+      body: text,
+    });
+    fileVerifyState.value = 'success';
+    fileVerifyMessage.value = '验真完成';
+  } catch (error) {
+    fileVerifyState.value = 'error';
+    fileVerifyMessage.value =
+      error instanceof HttpError
+        ? fileVerifyErrorMessage(error.status)
+        : '网络请求失败，请稍后重试';
+  }
+}
+function onFileSelect(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) void handleFile(file);
+}
+function onDrop(event: DragEvent): void {
+  event.preventDefault();
+  dragOver.value = false;
+  const file = event.dataTransfer?.files[0];
+  if (file) void handleFile(file);
+}
+function onDragOver(event: DragEvent): void {
+  event.preventDefault();
+  dragOver.value = true;
+}
+function onDragLeave(): void {
+  dragOver.value = false;
+}
+function fileVerifyErrorMessage(status: number): string {
+  if (status === 400) return '文件解析失败：不是有效的凭证 JSON，或缺少必填字段';
+  if (status === 413) return '文件超过大小限制';
+  if (status === 404) return '链上未找到该凭证';
+  if (status >= 500) return '验真服务暂时不可用，请稍后重试';
+  return '验真失败';
+}
+function credentialStatusLabel(status: CredentialStatus): string {
+  return (
+    {
+      PENDING_REVIEW: '待复核',
+      ACTIVE: '有效',
+      REJECTED: '已驳回',
+      SUPERSEDED: '已取代',
+      REVOKED: '已撤销',
+    }[status] ?? status
+  );
 }
 function shortHash(value: string): string {
   return `${value.slice(0, 10)} ··· ${value.slice(-8)}`;
@@ -1901,6 +2051,13 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
                 >
                   创建披露授权
                 </button>
+                <button
+                  class="button secondary"
+                  :disabled="studentRecord.status !== 'ACTIVE'"
+                  @click="openExportPanel"
+                >
+                  导出标准凭证
+                </button>
               </div>
             </div>
           </article>
@@ -1924,6 +2081,74 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
               </div>
             </div>
           </article>
+          <section
+            v-if="exportPanelOpen && studentRecord"
+            class="operation-panel export-panel"
+          >
+            <div class="operation-heading">
+              <div>
+                <p class="eyebrow">STANDARD CREDENTIAL EXPORT</p>
+                <h3>导出标准凭证</h3>
+              </div>
+              <span>可下载 · 可独立验证</span>
+            </div>
+            <p class="panel-lead">
+              勾选要写入凭证的字段，生成一份带 Ed25519 签名与链上锚定的标准化凭证。默认二维码仍只含验证地址、凭证 ID 与摘要，不包含分数、课程名或盐值。
+            </p>
+            <form class="compact-form" @submit.prevent="exportCredential">
+              <fieldset class="field wide disclosure-fields">
+                <legend>导出字段</legend>
+                <label
+                  ><input
+                    v-model="exportForm.selectedFields"
+                    type="checkbox"
+                    value="courseName"
+                  />课程名称</label
+                ><label
+                  ><input
+                    v-model="exportForm.selectedFields"
+                    type="checkbox"
+                    value="score"
+                  />成绩分数</label
+                ><label
+                  ><input
+                    v-model="exportForm.selectedFields"
+                    type="checkbox"
+                    value="grade"
+                  />成绩等级</label
+                >
+              </fieldset>
+              <button
+                class="button primary"
+                :disabled="
+                  exportState === 'loading' || exportForm.selectedFields.length === 0
+                "
+              >
+                {{ exportState === 'loading' ? '正在导出…' : '生成标准凭证' }}
+              </button>
+              <p v-if="exportMessage" class="notice" :class="exportState">
+                {{ exportMessage }}
+              </p>
+            </form>
+            <article v-if="exportedCredential" class="export-result">
+              <div>
+                <h4>标准凭证已生成</h4>
+                <p>
+                  {{ exportedCredential.id }} · 摘要
+                  {{ exportedCredential.evidence.detailHash.slice(0, 16) }}…
+                </p>
+                <div class="export-actions">
+                  <button class="button secondary" type="button" @click="downloadExportedCredential">
+                    下载凭证 JSON</button
+                  ><button class="button secondary" type="button" @click="copyExportDigest">
+                    {{ exportCopyMessage || '复制验真摘要' }}</button
+                  ><button class="button primary" type="button" @click="openExportedVerification">
+                    预览验真结果</button
+                  >
+                </div>
+              </div>
+            </article>
+          </section>
           <section
             v-if="disclosurePanelOpen && studentRecord"
             class="operation-panel disclosure-panel"
@@ -2247,6 +2472,114 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash));
               </div>
             </dl>
           </article>
+          <section class="operation-panel file-verify-panel">
+            <div class="operation-heading">
+              <div>
+                <p class="eyebrow">FILE VERIFICATION</p>
+                <h3>上传凭证文件验真</h3>
+              </div>
+              <span>拖拽或选择 JSON 文件</span>
+            </div>
+            <p class="panel-lead">
+              上传学生导出的标准凭证文件，系统将分别校验签名、链上状态与详情锚定。
+            </p>
+            <label
+              class="drop-zone"
+              :class="{ 'drag-over': dragOver }"
+              @dragover="onDragOver"
+              @dragleave="onDragLeave"
+              @drop="onDrop"
+            >
+              <input
+                type="file"
+                accept=".json,application/json"
+                class="visually-hidden"
+                @change="onFileSelect"
+              />
+              <PhFileText :size="28" weight="duotone" />
+              <p>{{ fileName || '拖拽凭证文件到此处，或点击选择' }}</p>
+            </label>
+            <p v-if="fileVerifyMessage" class="notice" :class="fileVerifyState">
+              {{ fileVerifyMessage }}
+            </p>
+            <article v-if="fileVerification" class="file-verification-result">
+              <div class="file-result-head">
+                <span
+                  class="status"
+                  :class="fileVerification.conclusion === 'valid' ? 'active' : 'revoked'"
+                  >{{ fileVerification.conclusion === 'valid' ? 'VALID' : 'INVALID' }}</span
+                ><p>
+                  {{
+                    fileVerification.conclusion === 'valid'
+                      ? '签名、链上状态与详情锚定全部通过。'
+                      : '存在未通过的校验项，详见下方三段结论。'
+                  }}
+                </p>
+              </div>
+              <div class="segment-grid">
+                <section
+                  class="segment"
+                  :class="{ ok: fileVerification.signature.valid, fail: !fileVerification.signature.valid }"
+                >
+                  <header>
+                    <PhShieldCheck :size="18" weight="fill" />
+                    <h4>① 签名校验</h4>
+                  </header>
+                  <p>
+                    {{
+                      fileVerification.signature.valid
+                        ? 'Ed25519 签名有效'
+                        : '签名校验失败（文件可能被篡改或验证方法未知）'
+                    }}
+                  </p>
+                  <span class="mono">{{ fileVerification.signature.verificationMethod }}</span>
+                </section>
+                <section
+                  class="segment"
+                  :class="{
+                    ok: fileVerification.chainStatus.status === 'ACTIVE',
+                    fail: fileVerification.chainStatus.status !== 'ACTIVE',
+                  }"
+                >
+                  <header>
+                    <PhGlobe :size="18" weight="fill" />
+                    <h4>② 链上状态</h4>
+                  </header>
+                  <p>
+                    当前状态
+                    {{ credentialStatusLabel(fileVerification.chainStatus.status) }}（{{
+                      fileVerification.chainStatus.status
+                    }}）
+                  </p>
+                  <span class="mono"
+                    >v{{ fileVerification.chainStatus.version }} ·
+                    {{ fileVerification.chainStatus.issuerMspId }}</span
+                  >
+                </section>
+                <section
+                  class="segment"
+                  :class="{
+                    ok:
+                      fileVerification.anchor.detailHashMatch &&
+                      fileVerification.anchor.subjectHashMatch,
+                    fail:
+                      !fileVerification.anchor.detailHashMatch ||
+                      !fileVerification.anchor.subjectHashMatch,
+                  }"
+                >
+                  <header>
+                    <PhLink :size="18" weight="fill" />
+                    <h4>③ 详情锚定</h4>
+                  </header>
+                  <p>
+                    详情哈希 {{ fileVerification.anchor.detailHashMatch ? '一致' : '不一致' }} ·
+                    学生标识 {{ fileVerification.anchor.subjectHashMatch ? '一致' : '不一致' }}
+                  </p>
+                  <span class="mono">{{ fileVerification.chainStatus.credentialId }}</span>
+                </section>
+              </div>
+            </article>
+          </section>
           <section class="operation-panel disclosure-consume">
             <div class="operation-heading">
               <div>

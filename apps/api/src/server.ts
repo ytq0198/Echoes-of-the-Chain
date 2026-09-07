@@ -3,6 +3,7 @@ import { loadSessionConfig, SessionService } from './auth/session.js';
 import { loadFabricConfig } from './ledger/fabric-config.js';
 import { FabricCredentialLedger } from './ledger/fabric-ledger.js';
 import { DemoCredentialLedger } from './ledger/demo-ledger.js';
+import { loadIssuerKeys } from './vc/issuer-keys.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '127.0.0.1';
@@ -20,10 +21,18 @@ const ledger =
       : undefined;
 const sessionConfig = loadSessionConfig();
 const sessions = sessionConfig ? new SessionService(sessionConfig) : undefined;
+const issuerKeys = (() => {
+  try {
+    return loadIssuerKeys();
+  } catch {
+    return undefined;
+  }
+})();
 const app = buildApp({
   ledgerMode,
   ...(ledger ? { ledger } : {}),
   ...(sessions ? { sessions } : {}),
+  ...(issuerKeys ? { issuerKeys } : {}),
 });
 
 try {

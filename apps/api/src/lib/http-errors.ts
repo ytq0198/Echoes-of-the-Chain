@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 const statusByCode: Record<string, number> = {
   INVALID_ARGUMENT: 400,
   INVALID_JSON: 400,
+  FILE_TOO_LARGE: 413,
   MISSING_PRIVATE_DATA: 400,
   HASH_MISMATCH: 400,
   FORBIDDEN: 403,
@@ -70,6 +71,7 @@ function domainMessage(code: string): string {
     {
       INVALID_ARGUMENT: '请求参数无效',
       INVALID_JSON: '请求数据不是有效的 JSON 对象',
+      FILE_TOO_LARGE: '上传内容超过大小限制',
       MISSING_PRIVATE_DATA: '缺少隐私数据',
       HASH_MISMATCH: '隐私数据与公共哈希不一致',
       FORBIDDEN: '当前身份无权执行此操作',
