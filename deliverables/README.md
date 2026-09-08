@@ -3,7 +3,7 @@
 本目录不是第二套产品。课程答辩与竞赛提交都从同一仓库、同一 Fabric 网络、同一 API、同一 Web 界面和同一证据索引生成，只因时长和匿名规则采用不同材料编排。
 
 - `common/`：两类交付共用的产品事实、证据索引、功能边界与组员虚拟机环境说明。
-- `course/`：7 分钟陈述/演示材料及含团队信息的课程文件。
+- `course/`：课程陈述/演示材料及含团队信息的课程文件。
 - `competition/`：匿名函评材料骨架；不得出现学校、指导教师或成员身份。
 - `demo/`：服务器预检、启停、隧道和故障回退手册。
 
@@ -13,10 +13,11 @@
 
 - `course/ChainGrade_最终实验报告_LaTeX风格.pdf`：最终实验报告，A4 共 18 页。
 - `course/ChainGrade_项目介绍.docx`：项目介绍，共 16 页。
-- `course/ChainGrade_课程答辩_重制版.pptx`：7 分钟答辩稿，共 13 页。
+- `course/ChainGrade_课程答辩_重制版.pptx`：最终课程答辩稿，共 26 页，逐页讲稿已嵌入备注。
 - `course/member-contributions.md`：三人最终分工与 4:3:3 贡献评分。
-- `course/ChainGrade_课程演示录屏脚本.md`：演示视频录制脚本。
 - `course/课程最终提交清单.md`：打包前逐项核对表。
+
+课程提交不要求演示视频。`course/ChainGrade_课程演示录屏脚本.md` 仅保留为现场演示回退和后续竞赛参考，不属于课程必交材料。答辩讲稿的可编辑版本为 `course/ChainGrade_答辩讲稿_重制版.md`。
 
 可编辑的实验报告正文位于 `course/ChainGrade_最终实验报告.md` 与 `course/ChainGrade_最终实验报告_LaTeX风格.md`。报告以问题、设计原因、实现形式和实测数据为主线，直接引用同一项目的真实 Fabric、自动测试、恢复演练和浏览器截图证据。`course/ChainGrade_课程答辩.pptx` 与名称含“修复版”的 PDF 仅作为历史版本保留，不作为最终提交入口。
 
