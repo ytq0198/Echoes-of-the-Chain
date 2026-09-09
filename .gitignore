@@ -4,6 +4,7 @@
 
 # Research and rendering scratch files
 /tmp/
+/projects/
 
 # Local secrets and runtime state
 .tools/
