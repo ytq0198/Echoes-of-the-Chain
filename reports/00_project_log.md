@@ -420,3 +420,4 @@
 - benchmark 统一为 7 类负载 × 4 档并发 × 3 轮 = 84；故障恢复及完整 ledger audit 数据均保留证据来源和能力边界。
 - 25/25 页 Speaker Notes 与独立讲稿同步；全部页面重新渲染，SVG 质量门 0 error，PPTX 越界测试 0 overflow。
 - 最终文件覆盖 `deliverables/course/ChainGrade_课程答辩_重制版.pptx`，并新增 V4 设计说明、验收报告与 25 页联系图。
+- 根据终版复核意见，将结论页研究手帐插图以 V3 的可见权重用于目录和全部内容页；重新导出、全页渲染并确认 0 overflow。
