@@ -13,11 +13,12 @@
 
 - `course/ChainGrade_最终实验报告_LaTeX风格.pdf`：最终实验报告，A4 共 18 页。
 - `course/ChainGrade_项目介绍.docx`：项目介绍，共 16 页。
-- `course/ChainGrade_课程答辩_重制版.pptx`：最终课程答辩稿，共 26 页，逐页讲稿已嵌入备注。
+- `course/ChainGrade_课程答辩_重制版.pptx`：最终课程答辩稿，共 25 页，逐页讲稿已嵌入备注。
+- `course/demo视频.mp4`：项目演示讲解录屏，用于学生互评和成果展示。
 - `course/member-contributions.md`：三人最终分工与 4:3:3 贡献评分。
 - `course/课程最终提交清单.md`：打包前逐项核对表。
 
-课程提交不要求演示视频。`course/ChainGrade_课程演示录屏脚本.md` 仅保留为现场演示回退和后续竞赛参考，不属于课程必交材料。答辩讲稿的可编辑版本为 `course/ChainGrade_答辩讲稿_重制版.md`。
+课程原始要求明确将项目演示讲解视频列为必交材料。`course/ChainGrade_课程演示录屏脚本.md` 与实际录屏一同保留，便于教师核对演示路径。答辩讲稿的可编辑版本为 `course/ChainGrade_答辩讲稿_重制版.md`。
 
 可编辑的实验报告正文位于 `course/ChainGrade_最终实验报告.md` 与 `course/ChainGrade_最终实验报告_LaTeX风格.md`。报告以问题、设计原因、实现形式和实测数据为主线，直接引用同一项目的真实 Fabric、自动测试、恢复演练和浏览器截图证据。`course/ChainGrade_课程答辩.pptx` 与名称含“修复版”的 PDF 仅作为历史版本保留，不作为最终提交入口。
 

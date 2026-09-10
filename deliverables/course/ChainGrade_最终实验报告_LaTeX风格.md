@@ -15,9 +15,9 @@
     <tbody style="font-family:方正公文仿宋,华文仿宋;font-size:12pt;">
         <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">题　　目</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">ChainGrade</td></tr>
         <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">课程名称</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">区块链技术应用实践</td></tr>
-        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">姓　　名</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">魏子安</td></tr>
-        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">学　　号</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">3240101782</td></tr>
-        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">组　　别</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">魏子安、强璞、阳震</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">姓　　名</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">魏子安、强璞、阳震</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">学　　号</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;font-size:10.5pt;">3240101782、3240102045、3240105586</td></tr>
+        <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">组　　别</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">组长：魏子安；组员：强璞、阳震</td></tr>
         <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">专　　业</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">计算机科学与技术</td></tr>
         <tr style="font-weight:normal;"><td style="width:20%;text-align:right;border:none;">日　　期</td><td style="width:2%;border:none;">：</td><td style="width:40%;font-weight:normal;border:none;border-bottom:1px solid;text-align:center;font-family:华文仿宋;">2026 年 9 月 7 日</td></tr>
     </tbody>
@@ -42,11 +42,11 @@
 
 本项目由三名成员共同完成，分工按主责划分，不以模块作为个人私有代码。链码状态、API 契约和关键界面均要求另一名成员参与评审。
 
-| 成员           | 主要负责内容                                                      | 可核验成果                                                     |
-| -------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
-| 魏子安（组长） | 选题与总体架构、Fabric 网络、链码/API/Web 基础系统、隐私与申诉流程、服务器部署、课程材料和最终集成 | 主干设计与实现、原生 Fabric 恢复、链码部署、备份恢复、UI 验收、PR 评审修复与合并 |
-| 强璞           | 标准 VC 互操作与验证体验工作包                                   | PR #2：VC 模型、Ed25519 签发验证、学生导出、公开文件验证、测试与四视口截图 |
-| 阳震           | 可重复性能基准与故障证据工作包                                   | PR #1：隔离基准网络、负载矩阵、资源采样、故障恢复、账本审计和实验报告 |
+| 成员           | 学号       | 主要负责内容                                                      | 可核验成果                                                     |
+| -------------- | ---------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
+| 魏子安（组长） | 3240101782 | 选题与总体架构、Fabric 网络、链码/API/Web 基础系统、隐私与申诉流程、服务器部署、课程材料和最终集成 | 主干设计与实现、原生 Fabric 恢复、链码部署、备份恢复、UI 验收、PR 评审修复与合并 |
+| 强璞           | 3240102045 | 标准 VC 互操作与验证体验工作包                                   | PR #2：VC 模型、Ed25519 签发验证、学生导出、公开文件验证、测试与四视口截图 |
+| 阳震           | 3240105586 | 可重复性能基准与故障证据工作包                                   | PR #1：隔离基准网络、负载矩阵、资源采样、故障恢复、账本审计和实验报告 |
 
 组长按实际工作范围和可核验成果给出 10 分制贡献评分：魏子安 4 分、强璞 3 分、阳震 3 分。两名组员的原始提交作者信息分别保留在 PR #2 和 PR #1 中，组长的合并提交不改变工作归属。
 

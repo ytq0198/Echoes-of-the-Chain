@@ -1,10 +1,16 @@
 # Local course materials supplied outside the project repository
 /区块链技术应用实践大程要求.pdf
 /参考选题.pdf
+**/区块链技术应用实践大程要求.pdf
 
 # Research and rendering scratch files
 /tmp/
 /projects/
+/submission/
+
+# Large local course recording and generated submission archives
+/deliverables/course/demo视频.mp4
+*.zip
 
 # Local secrets and runtime state
 .tools/
