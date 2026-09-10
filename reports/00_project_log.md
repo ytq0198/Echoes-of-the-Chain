@@ -421,3 +421,11 @@
 - 25/25 页 Speaker Notes 与独立讲稿同步；全部页面重新渲染，SVG 质量门 0 error，PPTX 越界测试 0 overflow。
 - 最终文件覆盖 `deliverables/course/ChainGrade_课程答辩_重制版.pptx`，并新增 V4 设计说明、验收报告与 25 页联系图。
 - 根据终版复核意见，将结论页研究手帐插图以 V3 的可见权重用于目录和全部内容页；重新导出、全页渲染并确认 0 overflow。
+
+## 2026-09-10：演示录屏环境与操作手册
+
+- 学校服务器 Docker 已恢复；本阶段仍使用已验证的原生 Fabric 2.5.16 路径恢复既有账本，未执行重置。
+- Orderer、Org1/Org2 Peer、CCaaS、API 和 Web 均已启动，本机 5173 SSH 隧道已建立，浏览器显示真实 Fabric 已连接。
+- 固定演示凭证保持 `ACTIVE`，固定申诉保持 `OPEN`；幂等播种没有新增对象。
+- 将课程录屏脚本扩写为完整操作手册，覆盖四角色生命周期、VC、有限披露、敏感信息遮挡、只读补录、故障回退和结束清理。
+- 新增 `reports/26_demo_recording_runbook.md`，记录启动证据、首次恢复等待超时和非交互 PATH 问题及其处理。
