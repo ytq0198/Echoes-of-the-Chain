@@ -18,6 +18,7 @@
 - `course/member-contributions.md`：三人最终分工与 4:3:3 贡献评分。
 - `course/课程最终提交清单.md`：打包前逐项核对表。
 - `course/ChainGrade_课程答辩深度讲解与问答手册.md`：设计思路、代码原理、实验口径、演示顺序与教师问答准备。
+- `course/ChainGrade_Fabric网络结构与代码原理.md`：Fabric 拓扑、端口与身份、CCaaS 生命周期、交易时序、背书与私有数据边界、故障恢复及网络专项问答。
 
 课程原始要求明确将项目演示讲解视频列为必交材料。`course/ChainGrade_课程演示录屏脚本.md` 与实际录屏一同保留，便于教师核对演示路径。答辩讲稿的可编辑版本为 `course/ChainGrade_答辩讲稿_重制版.md`。
 
