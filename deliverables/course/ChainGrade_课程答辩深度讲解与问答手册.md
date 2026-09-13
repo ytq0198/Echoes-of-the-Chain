@@ -140,6 +140,219 @@ $$
 - API：Schema 再校验、Cookie/CSRF、规范化与哈希、Gateway 调用、错误码翻译；
 - Chaincode：证书属性、组织约束、状态机、原子读写和私有数据承诺。
 
+### 4.4 Fabric 网络结构与代码原理
+
+这一节是代码答辩的网络层主线。不要只画“前端—后端—区块链”三个框，而要说明节点由什么脚本启动、各自保存什么、一次交易如何从 API 到两个 Peer，以及当前拓扑究竟证明了什么。
+
+#### 4.4.1 逻辑拓扑和物理进程
+
+```text
+                                         ┌────────────────────────────┐
+                                         │ orderer.example.com        │
+                                         │ OrdererMSP / Raft          │
+                                         │ 7050 排序  7053 管理       │
+                                         └─────────────┬──────────────┘
+                                                       │ 生成区块并分发
+                         ┌─────────────────────────────┴─────────────────────────────┐
+                         ▼                                                           ▼
+┌─────────────────────────────────────────┐                    ┌─────────────────────────────────────────┐
+│ peer0.org1.example.com                  │                    │ peer0.org2.example.com                  │
+│ Org1MSP                                 │                    │ Org2MSP                                 │
+│ 7051 Peer gRPC / 7052 链码服务 / 9444 运维 │                  │ 9051 Peer gRPC / 9052 链码服务 / 9445 运维 │
+│ 公共账本 + Org1 隐式私有集合明文       │                    │ 公共账本 + Org1 私有数据哈希           │
+└───────────────┬─────────────────────────┘                    └───────────────┬─────────────────────────┘
+                │ Gateway 连接                                                │ 链码生命周期安装/批准
+                └───────────────────────┬─────────────────────────────────────┘
+                                        ▼
+                              ┌────────────────────┐
+                              │ grade CCaaS        │
+                              │ Node.js / 9999     │
+                              │ package ID 绑定    │
+                              └────────────────────┘
+                                        ▲
+                                        │ TLS gRPC + actor 证书签名
+                              ┌────────────────────┐
+                              │ Fastify API        │
+                              │ Fabric Gateway SDK │
+                              └────────────────────┘
+```
+
+当前所有业务 Gateway 都连接 `peer0.org1:7051`，但 issuer、reviewer、student 使用三套不同的 Org1 客户端证书和私钥。Org2 Peer 不直接承载浏览器用户身份，而是保存同一通道的第二份公共账本、参与链码生命周期，并用于一致性和恢复实验。
+
+| 进程/对象 | 身份 | 端口或位置 | 实际职责 |
+| --- | --- | --- | --- |
+| Orderer | `OrdererMSP` | 7050；管理端 7053；运维端 9443 | 接收已背书交易、排序、组成区块；不执行成绩链码 |
+| Org1 Peer | `Org1MSP` | 7051；Peer 链码服务端 7052；运维端 9444 | 接收 Gateway 提案、模拟和背书；保存公共状态及 Org1 私有详情 |
+| Org2 Peer | `Org2MSP` | 9051；Peer 链码服务端 9052；运维端 9445 | 保存公共账本副本、验证区块、参与链码生命周期和恢复核验 |
+| grade CCaaS | 链码 package ID | 127.0.0.1:9999 | 独立 Node.js 进程执行 `grade` 合约；实验拓扑中两个 Peer 连接同一服务实例 |
+| 通道 | `chaingrade` | 通道配置块 | 隔离本项目账本和链码定义 |
+| 链码定义 | `grade` 0.9 sequence 1 | 两组织批准后提交 | 绑定名称、版本、序号、包与背书策略 |
+
+#### 4.4.2 两种启动路径为什么都存在
+
+项目保留两条网络启动路径，但它们使用同一套 Fabric 2.5.16 语义，不是“真链”和“假链”两套业务实现。
+
+| 路径 | 入口代码 | 作用 | 使用场景 |
+| --- | --- | --- | --- |
+| 标准容器路径 | `infra/fabric/network.sh` | 包装 Fabric 官方 test-network，使用 CA、Docker、LevelDB 建立双组织网络 | 初始开发和 Docker 正常环境 |
+| 原生进程路径 | `infra/fabric-native/native-network.sh`、`deploy-chaincode.sh` | 使用已经固定版本的 `peer`、`orderer`、`configtxgen`、`osnadmin` 二进制直接运行 | 学校服务器 Docker 存储故障后的可恢复运行路径 |
+
+标准路径的 `network.sh up` 实际调用官方脚本：
+
+```bash
+./network.sh up createChannel -ca -s leveldb \
+  -c chaingrade -i 2.5.16 -cai 1.5.17
+```
+
+它创建 Org1、Org2、Orderer 的 MSP/TLS 材料和 `chaingrade` 通道，然后调用 `enroll-identities.sh` 注册三类业务证书。`bootstrap.sh` 将 Fabric、Fabric CA、fabric-samples commit 和 jq 都锁定到 `versions.env`，下载内容进入 `.tools`，不会依赖服务器碰巧安装的系统版本。
+
+原生路径产生的仍是真实 Fabric 区块、背书、排序和 Peer 世界状态，只是不通过 Docker 管理进程。它复用已经生成的 MSP/TLS 材料，把账本、WAL、快照、PID 和日志放进 `.runtime/native-fabric`。`.tools` 和 `.runtime` 都不进入 Git 或提交包。
+
+#### 4.4.3 原生网络怎样建立通道
+
+`native-network.sh up` 按以下顺序工作：
+
+1. `preflight.sh` 检查 `peer`、`orderer`、`osnadmin`、`configtxgen` 是否存在，证书是否至少再有效 24 小时，所需端口和 10 GiB 磁盘空间是否满足；
+2. `prepare_channel_block` 把官方 `configtx.yaml` 中的容器主机名改成 localhost；
+3. `configtxgen -profile ChannelUsingRaft` 生成 `chaingrade.block`；
+4. 启动单个 Raft Orderer，启用 channel participation API；
+5. 用 `osnadmin channel join` 让 Orderer 加入 `chaingrade`；
+6. 分别启动 Org1 Peer 和 Org2 Peer；
+7. 使用两组织管理员 MSP 执行 `peer channel join -b chaingrade.block`；
+8. `status` 只检查受管 PID，随后还需要账本和读写探针判断业务是否恢复。
+
+关键代码位置：
+
+| 文件与行段 | 做了什么 | 为什么需要 |
+| --- | --- | --- |
+| `native-network.sh:41–54` | 生成本机可用的 Raft 通道块 | 容器 DNS 名称在原生进程模式下不可解析 |
+| `native-network.sh:56–105` | 配置 TLS、MSP、WAL/快照并启动 Orderer | 把排序服务的数据目录限制在项目运行区 |
+| `native-network.sh:107–146` | 参数化启动两个 Peer | 同一函数避免 Org1/Org2 配置漂移 |
+| `native-network.sh:148–162` | 以各组织管理员身份加入通道 | Peer 启动不等于已经拥有该通道账本 |
+| `native-network.sh:200–209` | 严格控制启动顺序 | 先有通道和排序服务，再启动并加入 Peer |
+
+#### 4.4.4 三类业务身份如何进入证书
+
+`infra/fabric/enroll-identities.sh` 连接 Org1 CA，在开发网络中注册并登记：
+
+```text
+cgissuer   → app.role=issuer
+cgreviewer → app.role=reviewer
+cgstudent  → app.role=student, subject.hash=<demo student hash>
+```
+
+属性使用 `:ecert` 写入登记证书。最终 MSP 目录分别是：
+
+```text
+.../users/ChaingradeIssuer@org1.example.com/msp
+.../users/ChaingradeReviewer@org1.example.com/msp
+.../users/ChaingradeStudent@org1.example.com/msp
+```
+
+API 的 `fabric-config.ts` 只保存这些目录位置，不把证书和私钥复制到源码。`FabricCredentialLedger.newIdentity()` 从 `signcerts` 读取证书，`newSigner()` 从 `keystore` 读取私钥并建立签名器。
+
+“独立复核”的准确含义是 issuer 与 reviewer 是两张不同证书、不同 `app.role` 的独立应用身份，链码还比较提交者和复核者身份摘要。当前二者都属于 `Org1MSP`，所以这不是“跨组织复核”。如果要实现跨院系或跨学校复核，应把 reviewer 身份放到独立 MSP，并把背书策略改为同时要求相关组织。
+
+#### 4.4.5 链码为什么采用 CCaaS，以及如何部署
+
+Docker 受损时，传统“Peer 构建并启动链码容器”的方式不可用。项目采用 Chaincode-as-a-Service（CCaaS），让 `grade` 合约作为可管理的 Node.js 进程运行。
+
+`deploy-chaincode.sh` 的生命周期是：
+
+```text
+生成 connection.json(address=127.0.0.1:9999)
+  → 生成 metadata.json(type=ccaas)
+  → 以固定排序/时间/owner 打包，保证 package ID 可重复
+  → calculatepackageid
+  → 在 Org1、Org2 Peer 分别 install
+  → 编译 TypeScript，使用 package ID 启动 fabric-chaincode-node server
+  → Org1、Org2 分别 approveformyorg
+  → commit 链码定义，并同时指定两个 Peer 地址
+  → querycommitted 核对 version=0.9、sequence=1
+```
+
+这里必须区分三个概念：
+
+- **安装 package**：让某个 Peer 知道如何连接该链码服务；
+- **组织批准 definition**：组织同意名称、版本、序号和策略；
+- **提交 definition**：把各方认可的链码定义写入通道配置，使 `grade` 可被调用。
+
+`start` 与 `deploy` 也不同：首次安装/升级使用 `deploy`；账本重启后使用 `start`，它要求包已安装、定义已提交，只重新启动 CCaaS，不重复提交链码生命周期交易。
+
+#### 4.4.6 当前背书策略到底保证什么
+
+开发网络的策略是：
+
+```text
+OR('Org1MSP.peer','Org2MSP.peer')
+```
+
+它表示 Org1 或 Org2 的一个合法 Peer 背书即可满足策略，不是“双组织必须共同签字”。API Gateway 当前连接 Org1 Peer，而成绩详情写入 Org1 隐式私有集合，因此普通业务交易通常由 Org1 Peer 模拟和背书。Org2 从区块中获得公共写集与私有数据哈希，不获得 Org1 私有成绩明文。
+
+选择 `OR` 的原因是课程开发拓扑只有 Org1 持有该隐式集合的详情，强制 Org2 同时模拟包含 Org1 私有数据的写入会与隐私分发边界冲突。它能证明 Peer 验证和账本复制，但不能证明“每条成绩都经过两个组织共同背书”。生产化可按业务记录使用状态级背书，或设计双方都能验证但不获得成绩明文的多组织承诺流程。
+
+还要区分背书和复核：
+
+- Fabric **背书**是节点对链码模拟结果签名；
+- 业务 **复核**是 reviewer 身份调用 `ApproveCredential` 改变成绩状态。
+
+当前 reviewer 的业务批准是一笔新的链上交易，不等同于 Org2 Peer 的 Fabric 背书。
+
+#### 4.4.7 一笔写交易完整经过哪些步骤
+
+以教师创建成绩草稿为例：
+
+1. 浏览器向 Fastify API 提交请求，Cookie 证明会话，CSRF Token 和 Origin 防止跨站伪造；
+2. API 校验 Schema，把成绩详情确定性序列化并计算 `detailHash`；
+3. `FabricCredentialLedger.contractFor('issuer')` 选择 issuer MSP；若已有连接则复用角色连接；
+4. `newGrpcClient()` 使用 Org1 Peer TLS 根证书连接 `localhost:7051`，并以 `peer0.org1.example.com` 作为证书主机别名验证；
+5. Gateway 用 issuer 证书和私钥对提案签名，公共草稿进入 arguments，成绩详情进入 transient data；
+6. Org1 Peer 调用 9999 上的 CCaaS 模拟 `CreateCredentialDraft`，链码检查 `app.role`、状态、ID 和详情承诺，形成公共/私有读写集并背书；
+7. Gateway 将已背书交易提交到 Orderer；Orderer 不理解成绩业务，只负责排序和组成区块；
+8. 两个 Peer 接收区块，验证背书策略与 MVCC 版本：有效交易更新公共账本，Org1 还提交私有详情，Org2 只保存对应私有哈希；
+9. API 等待 commit status，再向浏览器返回成功。收到 HTTP 201 时不是“已发送”，而是当前 Gateway 已确认提交结果。
+
+代码中的超时分层为：查询 5 秒、背书 30 秒、向排序服务提交 10 秒、等待提交状态 60 秒。这样慢背书、排序失败和提交超时能被区分，而不是无限挂起。
+
+#### 4.4.8 查询为什么不经过 Orderer
+
+`evaluateTransaction` 只在连接的 Peer 上模拟查询并返回结果，不产生区块，也不经过 Orderer；`submit`/`submitTransaction` 才走背书、排序和提交路径。因此：
+
+- 公开验真和列表查询可以在 Orderer 暂停时从已有 Peer 状态继续读取；
+- 创建、批准、撤销和消费授权等写操作需要 Orderer；
+- 单 Peer 查询只反映该 Peer 已提交的状态，高可信验证可比较多个 Peer 或等待区块同步。
+
+项目的 `ledger-info.sh` 分别以 Org1 和 Org2 管理员上下文调用 `peer channel getinfo -c chaingrade`，比较 `height`、`currentBlockHash` 和 `previousBlockHash`。字符串完全一致才返回 `consistent=true`。这比只检查两个 Peer 进程存活更能说明账本是否同步。
+
+#### 4.4.9 网络状态存放在哪里，如何避免污染仓库
+
+| 路径 | 内容 | 是否进入 Git |
+| --- | --- | --- |
+| `.tools/fabric-samples` | 固定版本二进制、配置、开发 MSP/TLS 材料 | 否 |
+| `.runtime/native-fabric/data` | Orderer 账本/WAL/快照和 Peer 世界状态/区块 | 否 |
+| `.runtime/native-fabric/channel` | 本机通道配置块 | 否 |
+| `.runtime/native-fabric/pids`、`logs` | 受管进程 PID 和诊断日志 | 否 |
+| `infra/fabric*` | 可复现的脚本和版本声明 | 是 |
+
+冷备份脚本先停止 CCaaS、Peer 和 Orderer，使磁盘状态静止，再生成归档和 SHA-256。备份包含 MSP 私钥，因此保存在仓库外并设置 `0600`。恢复脚本要求显式 `--confirm-restore`，并把原运行目录移动为带时间戳的 `pre-restore` 目录，而不是直接删除，便于失败回退。
+
+#### 4.4.10 当前网络结构的证据边界
+
+当前拓扑能够证明：
+
+- 真实 Fabric 2.5.16 的证书、背书、排序、区块提交和私有集合能够运行；
+- Org1、Org2 Peer 可以维持一致的公共账本；
+- 业务角色由独立证书属性约束，而不是由前端下拉框决定；
+- Peer、CCaaS、Orderer 故障后可以按探针判据恢复。
+
+当前拓扑不能证明：
+
+- 每笔成绩经过两个组织共同背书；
+- reviewer 属于独立院系/学校 MSP；
+- 单 Orderer 故障时写入不中断；
+- 单个 9999 CCaaS 服务实例故障时链码无感切换；
+- WSL 回环性能等于跨主机生产性能。
+
 ## 5. 数据模型与隐私原理
 
 ### 5.1 公共状态和私有详情
@@ -577,6 +790,53 @@ A：当前核心凭证状态和有效性以 Fabric 为权威来源；课程实�
 **Q35：系统当前最大的不足是什么？**  
 A：一是单 Orderer 不具备写入高可用；二是终端身份仍通过 API 托管 Gateway 证书，未形成学校级证书生命周期；三是有限披露不是零知识证明；四是性能数据来自单机 WSL；五是跨校信任、Schema 注册和撤销治理仍未建立。
 
+### 13.8 Fabric 网络结构与运维
+
+**Q36：Orderer 会执行智能合约或判断成绩是否合法吗？**
+A：不会。Peer 在背书阶段模拟链码并形成读写集，Orderer 只对已背书交易排序和组成区块。区块到达 Peer 后，Peer 再验证背书策略与 MVCC 版本并提交。成绩状态是否合法由链码和 Peer 模拟结果决定，不由 Orderer 决定。
+
+**Q37：Org1 和 Org2 在当前项目中分别做什么？**
+A：Org1 承载 issuer、reviewer、student 三类应用身份，Gateway 默认连接 Org1 Peer，Org1 隐式私有集合保存成绩详情。Org2 Peer 保存同一通道的公共账本副本，参与链码安装和组织批准，并用于账本一致性及故障恢复核验。当前 Org2 不是业务 reviewer 所属组织。
+
+**Q38：既然有两个组织，为什么背书策略不是 AND？**
+A：当前成绩详情写入 Org1 隐式私有集合，Org2 不应得到明文。开发策略 `OR('Org1MSP.peer','Org2MSP.peer')` 允许由持有私有数据的 Org1 完成模拟和背书。它是隐私边界和最小实验拓扑之间的工程选择，但确实不能证明双组织共同背书。生产化应重新设计集合与状态级背书，使多方能共同确认必要承诺而不获得多余明文。
+
+**Q39：独立复核和双组织背书有什么区别？**
+A：独立复核是业务层动作：不同 `app.role` 的 reviewer 证书调用 `ApproveCredential`，且身份摘要不能与提交者相同。双组织背书是 Fabric 层策略：要求哪些 MSP 的 Peer 对同一次模拟结果签名。当前实现了前者，没有要求后者。
+
+**Q40：三个登录账号是不是三套 Fabric 节点？**
+A：不是。浏览器账号建立 API 会话；API 根据角色选择三套 Org1 客户端 MSP。它们连接同一个 Org1 Peer，但用不同证书给提案签名。节点是 Orderer、两个 Peer 和 CCaaS 进程，用户身份与节点进程不能混为一谈。
+
+**Q41：为什么 API 只连 Org1 Peer，Org2 还有意义吗？**
+A：当前业务私有数据属于 Org1，默认入口连接 Org1 最直接。Org2 仍独立验证区块、保存公共账本、参与链码生命周期并提供一致性和恢复证据。不过单入口意味着查询可用性仍依赖 Org1；生产化应配置多 Gateway 入口、故障切换和按组织路由。
+
+**Q42：Docker 故障后运行的还是区块链吗？**
+A：是。原生路径直接启动官方 Fabric 2.5.16 的 `orderer` 和 `peer` 二进制，仍然执行 MSP/TLS、链码背书、Raft 排序、区块提交、MVCC 和 PDC。变化的是进程管理方式，不是把账本换成内存模拟。演示账本只用于特定前端开发场景，不能与原生 Fabric 混称。
+
+**Q43：CCaaS 与普通链码容器有什么区别？**
+A：普通模式通常由 Peer 通过容器运行时构建和启动链码；CCaaS 的链码包只声明外部服务地址和类型，链码作为独立进程启动，并用 package ID 与 Peer 建立连接。它便于在 Docker 不可用时管理 Node.js 链码，但当前单实例 9999 也是一个故障点。
+
+**Q44：链码为什么要在两个 Peer 安装并由两个组织批准？**
+A：安装让每个 Peer 识别同一 package ID；组织批准表示每个通道成员认可名称、版本、序号和策略；提交 definition 后通道才可调用该链码。当前脚本在两 Peer 安装、两组织批准，然后在提交时同时指定两个 Peer，保证生命周期配置一致。它不意味着普通业务交易必须得到两个 Peer 背书，后者由 signature policy 决定。
+
+**Q45：`version=0.9` 和 `sequence=1` 分别是什么？**
+A：version 是团队定义的链码版本标签；sequence 是 Fabric 用于控制定义升级次序的单调递增整数。升级实现或策略时应提交新的定义并增加 sequence，不能只改 version 而保持旧 sequence 反复覆盖。
+
+**Q46：一次查询和一次写交易在网络路径上有什么不同？**
+A：查询通过 `evaluateTransaction` 在目标 Peer 本地模拟并返回，不经过 Orderer，也不形成区块。写操作通过 `submit` 完成提案、背书、排序、区块分发、验证和提交，并等待 commit status。Orderer 故障时已有状态可能还能查询，但不能形成新的有效写入。
+
+**Q47：Org2 为什么看不到成绩却能验证区块？**
+A：Org2 获得公共写集和私有数据哈希，可以验证公共状态转换、背书和该私有数据对应的哈希承诺，但不是 Org1 隐式集合成员，因此不获得成绩明文。这正是 PDC 将“账本一致性”和“明文可见性”分开的方式。
+
+**Q48：如何证明两个 Peer 的账本一致？**
+A：`ledger-info.sh` 分别连接 7051 和 9051 调用 `peer channel getinfo`，比较高度、当前区块哈希和前一区块哈希；三项完全一致才输出 `consistent=true`。故障基准还要求连续三次读写成功后再检查一致性，不能只看进程 PID 或端口。
+
+**Q49：如果 Org1 Peer 宕机，API 会自动切换到 Org2 吗？**
+A：当前不会。`fabric-config.ts` 配置的是单个 `peerEndpoint`，角色连接都缓存到该入口。Org2 能继续保存和同步公共账本，但当前应用没有多端点重试和私有数据路由。增加多 Gateway 连接、健康检查和按数据所属组织切换是生产化任务。
+
+**Q50：网络脚本如何防止误删服务器其他目录？**
+A：运行数据固定在项目的 `.runtime/native-fabric`。`reset` 在删除前用 `readlink -f` 校验解析后的路径必须精确等于该目录；备份根目录也限制在用户授权路径下。恢复不是覆盖删除，而是把原运行目录移动到带 UTC 时间戳的 `pre-restore` 目录，保留人工回退点。
+
 ## 14. 容易答错的问题和安全表述
 
 | 不建议的说法 | 原因 | 建议改成 |
@@ -606,7 +866,18 @@ A：一是单 Orderer 不具备写入高可用；二是终端身份仍通过 API
 
 不要连续滚动完整函数。每次只打开一个关键方法，按“输入—判断—写入—业务结果”说明。
 
-### 16.1 推荐展示一：批量原子性
+### 16.1 推荐展示一：网络启动与交易入口
+
+在进入业务链码前，建议先用 60–90 秒展示网络入口：
+
+- `infra/fabric-native/native-network.sh:200–209`：Orderer、两 Peer 的启动和入通道顺序；
+- `infra/fabric-native/deploy-chaincode.sh:175–189`：安装、启动 CCaaS、两组织批准、提交 definition；
+- `apps/api/src/ledger/fabric-ledger.ts:271–290`：API 按 actor 建立并缓存 Gateway 连接；
+- `apps/api/src/ledger/fabric-ledger.ts:320–339`：TLS Peer 连接、证书身份和私钥 signer。
+
+讲解顺序是“网络先启动并加入通道—链码完成生命周期—API 才能取得 contract—业务方法再提交交易”。这比直接从 Vue 页面跳到链码更完整。
+
+### 16.2 推荐展示二：批量原子性
 
 文件：`chaincode/grade-contract/src/grade-contract.ts`  
 方法：`CreateCredentialBatch`
@@ -618,7 +889,7 @@ A：一是单 Orderer 不具备写入高可用；二是终端身份仍通过 API
 3. 141 行以后才开始统一写入；
 4. 所有记录共享同一交易号。
 
-### 16.2 推荐展示二：修订切换
+### 16.3 推荐展示三：修订切换
 
 文件：`chaincode/grade-contract/src/grade-contract.ts`  
 方法：`ApproveCredential`
@@ -631,7 +902,7 @@ A：一是单 Orderer 不具备写入高可用；二是终端身份仍通过 API
 4. 前序必须仍为 `ACTIVE`；
 5. 同一交易完成旧 `SUPERSEDED` 和新 `ACTIVE`。
 
-### 16.3 推荐展示三：VC 联合验证
+### 16.4 推荐展示四：VC 联合验证
 
 文件：`apps/api/src/vc/verifier.ts`  
 方法：`verifyCredentialFile`
@@ -645,7 +916,7 @@ A：一是单 Orderer 不具备写入高可用；二是终端身份仍通过 API
 
 这段代码短、逻辑清楚，很适合回答“你们的 VC 创新在哪里”。
 
-### 16.4 推荐展示四：学生私有查询
+### 16.5 推荐展示五：学生私有查询
 
 文件：`chaincode/grade-contract/src/grade-contract.ts`  
 方法：`ReadMyCredentialPrivate`
